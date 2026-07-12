@@ -241,8 +241,12 @@ export const mockProductsApi = {
   },
   createOutflow: (id: number, body: { quantity: number; reason: string }) => {
     const idx = mockProducts.findIndex(p => p.id === id);
+    if (idx < 0) return Promise.reject(new Error('Mahsulot topilmadi'));
+    if (body.quantity > mockProducts[idx].quantity) {
+      return Promise.reject(new Error('Ombordagi qoldiq yetarli emas'));
+    }
     if (idx >= 0) {
-      mockProducts[idx].quantity = Math.max(0, mockProducts[idx].quantity - body.quantity);
+      mockProducts[idx].quantity -= body.quantity;
       mockMovements.push({ id: nextMovementId++, productName: mockProducts[idx].name, type: 'OUT', quantity: body.quantity, note: body.reason, createdAt: new Date().toISOString() });
     }
     return delay({ id, productName: mockProducts[idx]?.name ?? '', quantity: body.quantity, reason: body.reason, createdAt: new Date().toISOString() });
@@ -274,6 +278,11 @@ export const mockProductsApi = {
 export const mockOrdersApi = {
   getAll: (page = 0, size = 20) => delay(paginate([...mockOrders].reverse(), page, size)),
   create: (body: { items: { productId: number; quantity: number }[]; paymentType: string; customerName?: string; customerPhone?: string }) => {
+    const unavailableItem = body.items.find(item => {
+      const product = mockProducts.find(p => p.id === item.productId);
+      return !product || item.quantity <= 0 || item.quantity > product.quantity;
+    });
+    if (unavailableItem) return Promise.reject(new Error('Ombordagi qoldiq yetarli emas'));
     let total = 0;
     const items: OrderItemResponse[] = body.items.map(it => {
       const product = mockProducts.find(p => p.id === it.productId);
@@ -281,7 +290,7 @@ export const mockOrdersApi = {
       const costPrice = product?.costPrice ?? 0;
       total += price * it.quantity;
       if (product) {
-        product.quantity = Math.max(0, product.quantity - it.quantity);
+        product.quantity -= it.quantity;
         mockMovements.push({ id: nextMovementId++, productName: product.name, type: 'SALE', quantity: it.quantity, note: 'Sotildi', createdAt: new Date().toISOString() });
       }
       return { productId: it.productId, productName: product?.name ?? `#${it.productId}`, quantity: it.quantity, price, costPrice };

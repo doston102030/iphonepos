@@ -96,6 +96,11 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
 
   async function onSubmit(values: CheckoutForm) {
     if (items.length === 0) return;
+    const insufficientItem = items.find(item => item.quantity > item.product.quantity);
+    if (insufficientItem) {
+      toast.error(`${insufficientItem.product.name} uchun ombordagi qoldiq yetarli emas`);
+      return;
+    }
     try {
       await ordersApi.create({
         items: items.map(c => ({ productId: c.product.id, quantity: c.quantity })),
@@ -153,7 +158,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
                       <Minus className="h-4 w-4" />
                     </button>
                     <span className="w-6 text-center font-bold text-base">{c.quantity}</span>
-                    <button type="button" onClick={() => addItem(c.product)} className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20">
+                    <button type="button" disabled={c.quantity >= c.product.quantity} onClick={() => addItem(c.product)} className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 disabled:opacity-30">
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>

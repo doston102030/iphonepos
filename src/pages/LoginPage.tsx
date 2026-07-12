@@ -9,8 +9,10 @@ import { Logo } from '@/components/common/Logo';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
+const isDemoMode = import.meta.env.VITE_USE_MOCK === 'true';
+
 export default function LoginPage() {
-  const [pin, setPin] = useState('0000');
+  const [pin, setPin] = useState(isDemoMode ? '0000' : '');
   const [showPin, setShowPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -71,7 +73,7 @@ export default function LoginPage() {
 
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-foreground">Tizimga kirish</h2>
-            <p className="text-muted-foreground text-sm mt-1">Demo rejim — API ulanmaydi</p>
+            {isDemoMode && <p className="text-muted-foreground text-sm mt-1">Demo rejim — API ulanmaydi</p>}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -81,7 +83,7 @@ export default function LoginPage() {
                 <Input
                   id="pin"
                   type={showPin ? 'text' : 'password'}
-                  placeholder="0000 / 1111 / 2222"
+                  placeholder={isDemoMode ? '0000 / 1111 / 2222' : 'PIN kodni kiriting'}
                   value={pin}
                   onChange={e => setPin(e.target.value)}
                   className="pr-10"
@@ -97,11 +99,13 @@ export default function LoginPage() {
                   {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Demo PIN: <span className="font-mono font-semibold">0000</span> (SUPER_ADMIN) ·{' '}
-                <span className="font-mono font-semibold">1111</span> (ADMIN) ·{' '}
-                <span className="font-mono font-semibold">2222</span> (KASSIR)
-              </p>
+              {isDemoMode && (
+                <p className="text-xs text-muted-foreground">
+                  Demo PIN: <span className="font-mono font-semibold">0000</span> (SUPER_ADMIN) ·{' '}
+                  <span className="font-mono font-semibold">1111</span> (ADMIN) ·{' '}
+                  <span className="font-mono font-semibold">2222</span> (KASSIR)
+                </p>
+              )}
             </div>
 
             {error && (

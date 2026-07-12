@@ -301,6 +301,10 @@ function OutflowDialog({
 
   async function onSubmit(values: OutflowForm) {
     if (!product) return;
+    if (values.quantity > product.quantity) {
+      toast.error(`Ombordagi qoldiq: ${product.quantity} ${product.unit}`);
+      return;
+    }
     try {
       await productsApi.createOutflow(product.id, values);
       toast.success('Chiqim yaratildi');
@@ -319,7 +323,7 @@ function OutflowDialog({
           <FormField control={form.control} name="quantity" render={({ field }) => (
             <FormItem>
               <FormLabel className="font-semibold text-muted-foreground">Miqdor</FormLabel>
-              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} max={product?.quantity} {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />

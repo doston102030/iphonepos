@@ -18,7 +18,6 @@ import {
     CurrentTimeDisplay,
     TimeDivider,
     DurationDisplay,
-    FullscreenToggle,
     VolumeMenuButton,
     ProgressControl
 } from 'video-react';
@@ -72,7 +71,6 @@ export default function Video({
                     <TimeDivider key="time-divider" />
                     <DurationDisplay key="duration-display" />
                     <ProgressControl key="progress-control" />
-                    <FullscreenToggle key="fullscreen-toggle" />
                 </ControlBar>
                 <BigPlayButton position="center" />
             </Player>

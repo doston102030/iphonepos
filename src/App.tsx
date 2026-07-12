@@ -24,7 +24,7 @@ const App: React.FC = () => {
                     route.public ? (
                       <PublicRoute>{route.element}</PublicRoute>
                     ) : (
-                      <ProtectedRoute>{route.element}</ProtectedRoute>
+                      <ProtectedRoute allowedRoles={route.roles}>{route.element}</ProtectedRoute>
                     )
                   }
                 />
