@@ -212,6 +212,8 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
   );
 }
 
+import { MobileOverlay } from '@/components/common/MobileOverlay';
+
 function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -226,26 +228,30 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   function handleNav(path: string) { navigate(path); onClose(); }
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="p-0 rounded-t-2xl max-h-[85vh] flex flex-col bg-sidebar border-t border-border">
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
-        </div>
+    <MobileOverlay open={open} onOpenChange={onClose} title="Ko'proq">
+      <div className="flex flex-col h-full bg-muted/10 p-4 space-y-4">
         
-        <div className="px-4 py-4 flex items-center gap-3 shrink-0">
-          <div className="h-12 w-12 rounded-full bg-gradient-primary flex items-center justify-center shadow-sm shrink-0">
-            <span className="text-xl font-bold text-white">{user?.username?.[0]?.toUpperCase() ?? 'U'}</span>
+        {/* User Profile Card */}
+        <div className="bg-background rounded-3xl p-4 flex items-center justify-between shadow-sm border border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="h-14 w-14 rounded-full bg-gradient-primary flex items-center justify-center shadow-md shrink-0">
+              <span className="text-2xl font-bold text-white">{user?.username?.[0]?.toUpperCase() ?? 'U'}</span>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-foreground leading-tight">{user?.username}</p>
+              <p className="text-sm font-medium text-muted-foreground">{getRoleLabel(user?.role ?? '')}</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-base font-bold text-sidebar-foreground truncate">{user?.username}</p>
-            <p className="text-xs font-medium text-muted-foreground truncate">{getRoleLabel(user?.role ?? '')}</p>
-          </div>
+          <button
+            onClick={handleLogout}
+            className="h-12 w-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors"
+          >
+            <LogOut className="h-5 w-5" />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 space-y-1 pb-4">
-          <div className="mb-2 px-1">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Menyu</p>
-          </div>
+        {/* Menu Grid */}
+        <div className="grid grid-cols-2 gap-3">
           {moreItems.map(item => {
             const isActive = item.path === '/'
               ? location.pathname === '/'
@@ -255,41 +261,33 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
                 key={item.path}
                 onClick={() => handleNav(item.path)}
                 className={cn(
-                  'w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm font-medium transition-colors text-left',
-                  isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                  'flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50',
+                  isActive ? 'bg-primary/10 text-primary border-primary/20 shadow-sm' : 'bg-background text-foreground hover:bg-muted/50 shadow-sm'
                 )}
               >
-                {React.cloneElement(item.icon as React.ReactElement, { className: 'h-5 w-5' })}
-                <span>{item.label}</span>
+                <div className={cn(
+                  'h-12 w-12 rounded-2xl flex items-center justify-center',
+                  isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground'
+                )}>
+                  {React.cloneElement(item.icon as React.ReactElement, { className: 'h-6 w-6' })}
+                </div>
+                <span className="text-xs font-bold text-center">{item.label}</span>
               </button>
             );
           })}
           
-          <div className="mt-4 mb-2 px-1 pt-2 border-t border-border/50">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tizim</p>
-          </div>
-          
           <button
             onClick={toggleTheme}
-            className="w-full flex items-center justify-between px-3 py-3.5 rounded-xl text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 bg-background text-foreground hover:bg-muted/50 shadow-sm"
           >
-            <div className="flex items-center gap-3">
-              {theme === 'dark' ? <Sun className="h-5 w-5 text-amber-400" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
-              <span>Mavzuni o'zgartirish</span>
+            <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground">
+              {theme === 'dark' ? <Sun className="h-6 w-6 text-amber-400" /> : <Moon className="h-6 w-6" />}
             </div>
-            <span className="text-xs text-muted-foreground">{theme === 'dark' ? 'Qorong\'u' : 'Yorqin'}</span>
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left mt-2"
-          >
-            <LogOut className="h-5 w-5" />
-            <span>Tizimdan chiqish</span>
+            <span className="text-xs font-bold text-center">Mavzu</span>
           </button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </MobileOverlay>
   );
 }
 

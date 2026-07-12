@@ -77,10 +77,13 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
   );
 }
 
+import { MobileOverlay } from '@/components/common/MobileOverlay';
+import { Trash2 } from 'lucide-react';
+
 function CheckoutSheet({ open, onOpenChange, onCompleted }: {
   open: boolean; onOpenChange: (v: boolean) => void; onCompleted: () => void;
 }) {
-  const { items, totalPrice, clear } = useCart();
+  const { items, totalPrice, clear, addItem, decrementItem, removeItem } = useCart();
   const form = useForm<CheckoutForm>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: { paymentType: 'CASH', customerName: '', customerPhone: '' },
@@ -109,73 +112,113 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
     }
   }
 
+  const handleClear = () => {
+    clear();
+    onOpenChange(false);
+  };
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0">
-        <div className="flex justify-center pt-3 pb-2 shrink-0">
-          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title="Savatcha">
+      <div className="flex flex-col h-full bg-muted/10 relative">
+        <div className="absolute top-[-56px] right-4 z-50">
+          {items.length > 0 && (
+            <button onClick={handleClear} className="text-sm font-semibold text-destructive px-2 py-2">
+              Tozalash
+            </button>
+          )}
         </div>
-        <div className="px-4 pb-2 shrink-0">
-          <h3 className="text-lg font-bold">Savatcha</h3>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4 space-y-2 mb-3">
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Savatcha bo'sh</p>
-          ) : items.map(c => (
-            <div key={c.product.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-border bg-card shadow-sm">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{c.product.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(c.product.price)} × {c.quantity}</p>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 pb-32 space-y-4">
+          <div className="bg-background rounded-3xl p-2 space-y-2 shadow-sm border border-border/50">
+            {items.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground flex flex-col items-center justify-center opacity-60">
+                <ShoppingCart className="h-12 w-12 mb-3" />
+                <p>Savatcha bo'sh</p>
               </div>
-              <p className="text-sm font-bold shrink-0 text-accent">{formatCurrency(c.product.price * c.quantity)}</p>
-            </div>
-          ))}
-        </div>
-        <div className="shrink-0 bg-background px-4 pb-6 pt-2 border-t border-border mt-auto">
+            ) : items.map(c => (
+              <div key={c.product.id} className="flex flex-col gap-3 p-3 rounded-2xl bg-muted/20">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex-1">
+                    <p className="font-bold text-base leading-tight mb-1">{c.product.name}</p>
+                    <p className="text-sm text-muted-foreground">{formatCurrency(c.product.price)} / {c.product.unit}</p>
+                  </div>
+                  <button onClick={() => removeItem(c.product.id)} className="p-2 -mt-1 -mr-1 text-muted-foreground hover:text-destructive rounded-xl transition-colors">
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-lg text-primary">{formatCurrency(c.product.price * c.quantity)}</p>
+                  <div className="flex items-center gap-3 bg-background rounded-xl p-1 shadow-sm border border-border/50">
+                    <button type="button" onClick={() => decrementItem(c.product.id)} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-foreground hover:bg-muted/80">
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="w-6 text-center font-bold text-base">{c.quantity}</span>
+                    <button type="button" onClick={() => addItem(c.product)} className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20">
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-warning/10 border border-warning/20 rounded-2xl p-4 text-warning-foreground text-sm font-medium">
+            <p>Eng ko'pi {formatCurrency(totalPrice)} gacha chegirma qila olasiz. (tannarxdan pastga sota olmaysiz)</p>
+          </div>
+
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="paymentType" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-muted-foreground uppercase font-bold">To'lov turi</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="h-12 rounded-xl text-base font-semibold"><SelectValue /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="CASH" className="py-2.5 text-base font-semibold text-center">Naqd</SelectItem>
-                      <SelectItem value="CARD" className="py-2.5 text-base font-semibold text-center">Karta</SelectItem>
-                      <SelectItem value="DEBT" className="py-2.5 text-base font-semibold text-center">Qarz</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              {paymentType === 'DEBT' && (
+            <form id="checkout-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <p className="font-bold text-base mb-3 px-1">To'lov usuli</p>
                 <div className="grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => form.setValue('paymentType', 'CASH')} className={cn("h-14 rounded-2xl font-bold text-base transition-all border-2", paymentType === 'CASH' ? "border-primary bg-primary/10 text-primary" : "border-border/50 bg-background text-foreground")}>Naqd</button>
+                  <button type="button" onClick={() => form.setValue('paymentType', 'CARD')} className={cn("h-14 rounded-2xl font-bold text-base transition-all border-2", paymentType === 'CARD' ? "border-primary bg-primary/10 text-primary" : "border-border/50 bg-background text-foreground")}>Karta</button>
+                  <button type="button" disabled className={cn("h-14 rounded-2xl font-bold text-base transition-all border-2 opacity-50", "border-border/50 bg-background text-foreground")}>Aralash</button>
+                  <button type="button" onClick={() => form.setValue('paymentType', 'DEBT')} className={cn("h-14 rounded-2xl font-bold text-base transition-all border-2", paymentType === 'DEBT' ? "border-primary bg-primary/10 text-primary" : "border-border/50 bg-background text-foreground")}>Qarzga</button>
+                </div>
+              </div>
+
+              {paymentType === 'DEBT' && (
+                <div className="bg-background rounded-3xl p-4 space-y-4 shadow-sm border border-border/50 mt-4">
+                  <p className="font-bold text-sm text-muted-foreground px-1">Mijoz ma'lumotlari</p>
                   <FormField control={form.control} name="customerName" render={({ field }) => (
                     <FormItem>
-                      <FormControl><Input className="h-11 rounded-xl bg-muted" placeholder="Ism familiya" autoComplete="off" {...field} /></FormControl>
+                      <FormControl><Input className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 font-semibold" placeholder="Mijoz ismi" autoComplete="off" {...field} /></FormControl>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="customerPhone" render={({ field }) => (
                     <FormItem>
-                      <FormControl><Input className="h-11 rounded-xl bg-muted" placeholder="+998901234567" autoComplete="off" {...field} /></FormControl>
+                      <FormControl><Input className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 font-semibold" placeholder="+998901234567" autoComplete="off" {...field} /></FormControl>
                     </FormItem>
                   )} />
                 </div>
               )}
-              <Button
-                type="submit"
-                className="w-full h-14 rounded-2xl text-base font-bold shadow-hover mt-2"
-                disabled={form.formState.isSubmitting || items.length === 0}
-              >
-                {form.formState.isSubmitting ? 'Saqlanmoqda...' : `Tasdiqlash — ${formatCurrency(totalPrice)}`}
-              </Button>
             </form>
           </Form>
         </div>
-      </SheetContent>
-    </Sheet>
+
+        <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border/50 p-4 pb-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          <div className="flex justify-between items-end mb-4 px-2">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground font-medium">Jami:</p>
+              <p className="text-sm text-muted-foreground font-medium">To'lash kerak:</p>
+            </div>
+            <div className="space-y-1 text-right">
+              <p className="text-sm font-bold">{formatCurrency(totalPrice)}</p>
+              <p className="text-xl font-black text-success">{formatCurrency(totalPrice)}</p>
+            </div>
+          </div>
+          <Button
+            type="submit"
+            form="checkout-form"
+            className="w-full h-16 rounded-[1.25rem] text-xl font-bold bg-success hover:bg-success/90 shadow-lg shadow-success/20"
+            disabled={form.formState.isSubmitting || items.length === 0}
+          >
+            {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Buyurtmani tasdiqlash'}
+          </Button>
+        </div>
+      </div>
+    </MobileOverlay>
   );
 }
 

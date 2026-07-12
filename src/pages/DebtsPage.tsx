@@ -24,6 +24,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { PaginationControls } from '@/components/common/PaginationControls';
+import { MobileOverlay } from '@/components/common/MobileOverlay';
+import { NumericKeypad } from '@/components/common/NumericKeypad';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   debtsApi, type DebtResponse, extractContent, extractPage
@@ -83,48 +85,38 @@ function DebtDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{debt ? 'Qarzni tahrirlash' : 'Yangi qarz'}</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField control={form.control} name="customerName" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mijoz ismi</FormLabel>
-                  <FormControl><Input className="h-11" placeholder="Ism familiya" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="customerPhone" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Telefon</FormLabel>
-                  <FormControl><Input className="h-11" type="tel" inputMode="tel" placeholder="+998901234567" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="amount" render={({ field }) => (
-                <FormItem className="sm:col-span-2">
-                  <FormLabel>Summa (so'm)</FormLabel>
-                  <FormControl><Input className="h-11" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>
-                Bekor qilish
-              </Button>
-              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title={debt ? 'Qarzni tahrirlash' : 'Yangi qarz'}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-5 h-full flex flex-col">
+          <FormField control={form.control} name="customerName" render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold text-muted-foreground">Mijoz ismi</FormLabel>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" placeholder="Masalan: Alisher" {...field} autoComplete="off" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="customerPhone" render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold text-muted-foreground">Telefon raqami</FormLabel>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="tel" inputMode="tel" placeholder="+998901234567" {...field} autoComplete="off" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="amount" render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold text-muted-foreground">Qarz summasi</FormLabel>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4 font-bold" type="number" inputMode="numeric" min={0} {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <div className="mt-auto pt-6 pb-8">
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </MobileOverlay>
   );
 }
 
@@ -134,76 +126,80 @@ function PayDialog({
   open: boolean; onOpenChange: (v: boolean) => void;
   debt: DebtResponse | null; onSaved: () => void;
 }) {
-  const form = useForm<PayForm>({
-    resolver: zodResolver(paySchema),
-    defaultValues: { amount: 0 },
-  });
+  const [amountStr, setAmountStr] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (open && debt) {
-      form.reset({ amount: debt.remainingAmount });
+      setAmountStr(debt.remainingAmount.toString());
+    } else {
+      setAmountStr('');
     }
-  }, [open, debt, form]);
+  }, [open, debt]);
 
-  async function onSubmit(values: PayForm) {
+  async function handlePay() {
     if (!debt) return;
-    if (values.amount > debt.remainingAmount) {
-      form.setError('amount', { message: `Qolgan summa: ${formatCurrency(debt.remainingAmount)}` });
+    const amount = parseInt(amountStr, 10);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Summani to\'g\'ri kiriting');
       return;
     }
+    if (amount > debt.remainingAmount) {
+      toast.error(`Qolgan summa: ${formatCurrency(debt.remainingAmount)}`);
+      return;
+    }
+    setLoading(true);
     try {
-      await debtsApi.pay(debt.id, { amount: values.amount });
+      await debtsApi.pay(debt.id, { amount });
       toast.success("To'lov amalga oshirildi");
       onSaved();
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Xato yuz berdi');
+    } finally {
+      setLoading(false);
     }
   }
 
+  if (!debt) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Qarzni to'lash</DialogTitle>
-        </DialogHeader>
-        {debt && (
-          <div className="text-sm space-y-1 mb-2 p-3 bg-muted rounded-md">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Mijoz:</span>
-              <span className="font-medium">{debt.customerName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Umumiy qarz:</span>
-              <span className="font-semibold">{formatCurrency(debt.amount)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">To'langan:</span>
-              <span className="text-primary">{formatCurrency(debt.paidAmount)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Qolgan:</span>
-              <span className="font-bold text-destructive">{formatCurrency(debt.remainingAmount)}</span>
-            </div>
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title="To'lov">
+      <div className="flex flex-col h-full bg-background">
+        <div className="px-6 py-4 pb-2 text-center">
+          <h2 className="text-2xl font-bold tracking-tight mb-1">To'lovni qayd etish</h2>
+          <p className="text-destructive font-semibold">Qolgan qarz: {formatCurrency(debt.remainingAmount)}</p>
+        </div>
+
+        <div className="flex-1 flex flex-col justify-center px-6 py-4 shrink-0 min-h-[150px]">
+          <p className="text-sm text-muted-foreground mb-3 text-center">To'lov miqdori (so'm)</p>
+          <div className="flex items-center justify-center gap-1.5 border-b-2 border-border/50 pb-2 bg-muted/30 p-4 rounded-3xl mx-4">
+            <span className="text-3xl text-muted-foreground font-light">$</span>
+            <span className="text-4xl font-bold tracking-tighter text-foreground truncate">
+              {amountStr === '' ? '0' : parseInt(amountStr, 10).toLocaleString('ru-RU')}
+            </span>
           </div>
-        )}
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="amount" render={({ field }) => (
-              <FormItem>
-                <FormLabel>To'lov summasi</FormLabel>
-                <FormControl><Input className="h-11" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>Bekor</Button>
-              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>To'lash</Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        <div className="px-3 pb-6 mt-auto">
+          <Button 
+            className="w-full h-14 rounded-2xl text-xl font-bold bg-success hover:bg-success/90 shadow-lg shadow-success/25 mb-4 mx-1" 
+            onClick={handlePay} 
+            disabled={loading || amountStr === '' || parseInt(amountStr, 10) <= 0}
+          >
+            {loading ? "Jarayonda..." : "To'lash"}
+          </Button>
+          
+          <NumericKeypad 
+            value={amountStr} 
+            onChange={setAmountStr} 
+            onEnter={handlePay} 
+            allowDecimal={false} 
+            className="rounded-[28px] bg-muted/20 p-2 border border-border/40"
+          />
+        </div>
+      </div>
+    </MobileOverlay>
   );
 }
 

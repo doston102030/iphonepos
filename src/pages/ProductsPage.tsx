@@ -26,6 +26,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { PaginationControls } from '@/components/common/PaginationControls';
+import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -118,129 +119,119 @@ function ProductDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{product ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <p className="text-[11px] font-semibold text-muted-foreground tracking-wide mb-2 px-0.5">ASOSIY MA'LUMOTLAR</p>
-              <div className="rounded-xl border border-border divide-y divide-border overflow-hidden">
-                <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem className="space-y-0.5 px-3.5 py-3">
-                    <div className="flex items-center gap-3">
-                      <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">Nomi</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Masalan: Coca-Cola 0.5L" autoComplete="off"
-                          className={ROW_INPUT_CLASS} {...field} />
-                      </FormControl>
-                    </div>
-                    <FormMessage className="text-right" />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="barcode" render={({ field }) => (
-                  <FormItem className="space-y-0.5 px-3.5 py-3">
-                    <div className="flex items-center gap-2">
-                      <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">Shtrix-kod</FormLabel>
-                      <FormControl>
-                        <Input placeholder="1234567890123" autoComplete="off" className={ROW_INPUT_CLASS} {...field} />
-                      </FormControl>
-                      <ScanButton onClick={() => setScannerOpen(true)} className="shrink-0 h-8 w-8" />
-                    </div>
-                    <FormMessage className="text-right" />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="unit" render={({ field }) => (
-                  <FormItem className="space-y-0.5 px-3.5 py-3">
-                    <div className="flex items-center gap-3">
-                      <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">O'lchov birligi</FormLabel>
-                      <FormControl>
-                        <Input placeholder="dona" autoComplete="off" className={ROW_INPUT_CLASS} {...field} />
-                      </FormControl>
-                    </div>
-                    <FormMessage className="text-right" />
-                  </FormItem>
-                )} />
-              </div>
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title={product ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4 h-full flex flex-col">
+          <div className="flex-1">
+            <p className="text-[11px] font-semibold text-muted-foreground tracking-wide mb-2 px-0.5">ASOSIY MA'LUMOTLAR</p>
+            <div className="rounded-2xl border-0 bg-muted/30 shadow-sm overflow-hidden mb-6">
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem className="space-y-0.5 px-4 py-3 border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-20">Nomi</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Masalan: Coca-Cola 0.5L" autoComplete="off"
+                        className={ROW_INPUT_CLASS} {...field} />
+                    </FormControl>
+                  </div>
+                  <FormMessage className="text-right" />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="barcode" render={({ field }) => (
+                <FormItem className="space-y-0.5 px-4 py-3 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-20">Shtrix-kod</FormLabel>
+                    <FormControl>
+                      <Input placeholder="1234567890123" autoComplete="off" className={ROW_INPUT_CLASS} {...field} />
+                    </FormControl>
+                    <ScanButton onClick={() => setScannerOpen(true)} className="shrink-0 h-9 w-9 bg-background shadow-sm" />
+                  </div>
+                  <FormMessage className="text-right" />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="unit" render={({ field }) => (
+                <FormItem className="space-y-0.5 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-20">O'lchov</FormLabel>
+                    <FormControl>
+                      <Input placeholder="dona" autoComplete="off" className={ROW_INPUT_CLASS} {...field} />
+                    </FormControl>
+                  </div>
+                  <FormMessage className="text-right" />
+                </FormItem>
+              )} />
             </div>
 
-            <div>
-              <p className="text-[11px] font-semibold text-muted-foreground tracking-wide mb-2 px-0.5">NARX VA OMBOR</p>
-              <div className="rounded-xl border border-border divide-y divide-border overflow-hidden">
-                <FormField control={form.control} name="costPrice" render={({ field }) => (
-                  <FormItem className="space-y-0.5 px-3.5 py-3">
-                    <div className="flex items-center gap-3">
-                      <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">Kelish narxi</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
-                      </FormControl>
-                    </div>
-                    <FormMessage className="text-right" />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="price" render={({ field }) => (
-                  <FormItem className="space-y-0.5 px-3.5 py-3">
-                    <div className="flex items-center gap-3">
-                      <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">Sotish narxi</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
-                      </FormControl>
-                    </div>
-                    <FormMessage className="text-right" />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="quantity" render={({ field }) => (
-                  <FormItem className="space-y-0.5 px-3.5 py-3">
-                    <div className="flex items-center gap-3">
-                      <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">Ombordagi miqdori</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
-                      </FormControl>
-                    </div>
-                    <FormMessage className="text-right" />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="minQuantity" render={({ field }) => (
-                  <FormItem className="space-y-0.5 px-3.5 py-3">
-                    <div className="flex items-center gap-3">
-                      <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">Minimal miqdor</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
-                      </FormControl>
-                    </div>
-                    <FormMessage className="text-right" />
-                  </FormItem>
-                )} />
-              </div>
-              {sellPrice > 0 && (
-                <div className="flex items-center justify-between px-3.5 py-2.5 mt-2 rounded-xl bg-muted text-xs">
-                  <span className="text-muted-foreground">Bir dona foyda</span>
-                  <span className={cn('font-semibold', marginPct >= 0 ? 'text-success' : 'text-destructive')}>
-                    {formatCurrency(sellPrice - costPrice)} ({marginPct}%)
-                  </span>
-                </div>
-              )}
+            <p className="text-[11px] font-semibold text-muted-foreground tracking-wide mb-2 px-0.5">NARX VA OMBOR</p>
+            <div className="rounded-2xl border-0 bg-muted/30 shadow-sm overflow-hidden">
+              <FormField control={form.control} name="costPrice" render={({ field }) => (
+                <FormItem className="space-y-0.5 px-4 py-3 border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Kelish narxi</FormLabel>
+                    <FormControl>
+                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
+                    </FormControl>
+                  </div>
+                  <FormMessage className="text-right" />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="price" render={({ field }) => (
+                <FormItem className="space-y-0.5 px-4 py-3 border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Sotish narxi</FormLabel>
+                    <FormControl>
+                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
+                    </FormControl>
+                  </div>
+                  <FormMessage className="text-right" />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="quantity" render={({ field }) => (
+                <FormItem className="space-y-0.5 px-4 py-3 border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Ombordagi</FormLabel>
+                    <FormControl>
+                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
+                    </FormControl>
+                  </div>
+                  <FormMessage className="text-right" />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="minQuantity" render={({ field }) => (
+                <FormItem className="space-y-0.5 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Minimal miqdor</FormLabel>
+                    <FormControl>
+                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
+                    </FormControl>
+                  </div>
+                  <FormMessage className="text-right" />
+                </FormItem>
+              )} />
             </div>
+            {sellPrice > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 mt-4 rounded-2xl bg-success/10 text-sm">
+                <span className="text-success font-medium">Bir dona foyda</span>
+                <span className={cn('font-bold', marginPct >= 0 ? 'text-success' : 'text-destructive')}>
+                  {formatCurrency(sellPrice - costPrice)} ({marginPct}%)
+                </span>
+              </div>
+            )}
+          </div>
 
-            <DialogFooter className="pt-1 gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>
-                Bekor qilish
-              </Button>
-              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
+          <div className="pt-4 pb-6 mt-auto">
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
+            </Button>
+          </div>
+        </form>
+      </Form>
       <BarcodeScannerDialog
         open={scannerOpen}
         onOpenChange={setScannerOpen}
         onDetected={code => form.setValue('barcode', code, { shouldValidate: true })}
       />
-    </Dialog>
+    </MobileOverlay>
   );
 }
 
@@ -266,35 +257,33 @@ function RestockDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Omborni to'ldirish — {product?.name}</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="quantity" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Miqdor</FormLabel>
-                <FormControl><Input className="h-11" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="note" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Izoh (ixtiyoriy)</FormLabel>
-                <FormControl><Input className="h-11" placeholder="Izoh..." {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>Bekor</Button>
-              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>Saqlash</Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Omborni to'ldirish`}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
+          <div className="p-4 bg-muted/30 rounded-2xl mb-4 border border-border/50 text-center">
+            <p className="text-muted-foreground text-sm mb-1">Mahsulot</p>
+            <h3 className="font-bold text-lg">{product?.name}</h3>
+          </div>
+          <FormField control={form.control} name="quantity" render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold text-muted-foreground">Miqdor</FormLabel>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="note" render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold text-muted-foreground">Izoh (ixtiyoriy)</FormLabel>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" placeholder="Izoh..." autoComplete="off" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <div className="mt-auto pt-6 pb-8">
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>Saqlash</Button>
+          </div>
+        </form>
+      </Form>
+    </MobileOverlay>
   );
 }
 
@@ -320,33 +309,33 @@ function OutflowDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
-        <DialogHeader><DialogTitle>Chiqim — {product?.name}</DialogTitle></DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="quantity" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Miqdor</FormLabel>
-                <FormControl><Input className="h-11" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="reason" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sabab</FormLabel>
-                <FormControl><Input className="h-11" placeholder="Sabab..." {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>Bekor</Button>
-              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>Saqlash</Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Chiqim`}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
+          <div className="p-4 bg-muted/30 rounded-2xl mb-4 border border-border/50 text-center">
+            <p className="text-muted-foreground text-sm mb-1">Mahsulot</p>
+            <h3 className="font-bold text-lg">{product?.name}</h3>
+          </div>
+          <FormField control={form.control} name="quantity" render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold text-muted-foreground">Miqdor</FormLabel>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="reason" render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold text-muted-foreground">Sabab</FormLabel>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" placeholder="Sabab..." autoComplete="off" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <div className="mt-auto pt-6 pb-8">
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>Saqlash</Button>
+          </div>
+        </form>
+      </Form>
+    </MobileOverlay>
   );
 }
 
@@ -371,73 +360,73 @@ function ReceiveDialog({ open, onOpenChange, onSaved }: {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-lg">
-        <DialogHeader><DialogTitle>Tovar qabul qilish</DialogTitle></DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField control={form.control} name="barcode" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Shtrix-kod</FormLabel>
-                  <FormControl>
-                    <div className="flex gap-1.5">
-                      <Input className="h-11" placeholder="123456789" {...field} />
-                      <ScanButton onClick={() => setScannerOpen(true)} className="shrink-0 h-11 w-11" />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nomi (ixtiyoriy)</FormLabel>
-                  <FormControl><Input className="h-11" placeholder="Mahsulot nomi" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Tovar qabul qilish`}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
+          <div className="flex-1 space-y-4">
+            <FormField control={form.control} name="barcode" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-semibold text-muted-foreground">Shtrix-kod</FormLabel>
+                <FormControl>
+                  <div className="flex gap-2">
+                    <Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4 flex-1" placeholder="123456789" autoComplete="off" {...field} />
+                    <ScanButton onClick={() => setScannerOpen(true)} className="shrink-0 h-14 w-14 rounded-2xl bg-muted/30 shadow-sm" />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-semibold text-muted-foreground">Nomi (ixtiyoriy)</FormLabel>
+                <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" placeholder="Mahsulot nomi" autoComplete="off" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="quantity" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Miqdor</FormLabel>
-                  <FormControl><Input className="h-11" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="costPrice" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Kelish narxi (ixtiyoriy)</FormLabel>
-                  <FormControl><Input className="h-11" type="number" inputMode="numeric" min={0} {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="price" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sotish narxi (ixtiyoriy)</FormLabel>
-                  <FormControl><Input className="h-11" type="number" inputMode="numeric" min={0} {...field} /></FormControl>
+                  <FormLabel className="font-semibold text-muted-foreground">Miqdor</FormLabel>
+                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="unit" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>O'lchov (ixtiyoriy)</FormLabel>
-                  <FormControl><Input className="h-11" placeholder="dona" {...field} /></FormControl>
+                  <FormLabel className="font-semibold text-muted-foreground">O'lchov (ixtiyoriy)</FormLabel>
+                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" placeholder="dona" autoComplete="off" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
             </div>
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>Bekor</Button>
-              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>Qabul qilish</Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="costPrice" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-semibold text-muted-foreground">Kelish narxi (ixtiyoriy)</FormLabel>
+                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={0} {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="price" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-semibold text-muted-foreground">Sotish narxi (ixtiyoriy)</FormLabel>
+                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={0} {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+          </div>
+          <div className="pt-6 pb-8 mt-auto">
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>Qabul qilish</Button>
+          </div>
+        </form>
+      </Form>
       <BarcodeScannerDialog
         open={scannerOpen}
         onOpenChange={setScannerOpen}
         onDetected={code => form.setValue('barcode', code, { shouldValidate: true })}
       />
-    </Dialog>
+    </MobileOverlay>
   );
 }
 
@@ -458,43 +447,35 @@ function HistoryDialog({ open, onOpenChange, product }: {
   }, [open, product]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-lg">
-        <DialogHeader><DialogTitle>Restock tarixi — {product?.name}</DialogTitle></DialogHeader>
-        <div className="max-h-80 overflow-y-auto">
-          {loading ? (
-            <div className="space-y-2">
-              {[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
-          ) : history.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Tarix yo'q</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="whitespace-nowrap">Sana</TableHead>
-                    <TableHead className="whitespace-nowrap">Tur</TableHead>
-                    <TableHead className="whitespace-nowrap">Miqdor</TableHead>
-                    <TableHead className="whitespace-nowrap">Izoh</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.map(h => (
-                    <TableRow key={h.id}>
-                      <TableCell className="whitespace-nowrap text-xs">{formatDateTime(h.createdAt)}</TableCell>
-                      <TableCell className="whitespace-nowrap"><Badge variant="outline">{h.type}</Badge></TableCell>
-                      <TableCell className="whitespace-nowrap">{h.quantity}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{h.note ?? '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Tarix — ${product?.name || ''}`}>
+      <div className="p-4 flex flex-col h-full">
+        {loading ? (
+          <div className="space-y-3 mt-2">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
+          </div>
+        ) : history.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center opacity-70">
+            <History className="h-12 w-12 text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">Tarix topilmadi</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {history.map(h => (
+              <div key={h.id} className="p-4 bg-muted/30 border border-border/50 rounded-2xl flex items-center justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 bg-background">{h.type}</Badge>
+                  <p className="text-xs text-muted-foreground font-medium">{formatDateTime(h.createdAt)}</p>
+                  {h.note && <p className="text-xs mt-1 text-muted-foreground line-clamp-1">{h.note}</p>}
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-lg">{h.quantity}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </MobileOverlay>
   );
 }
 
