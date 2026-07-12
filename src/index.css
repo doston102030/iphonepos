@@ -129,6 +129,9 @@
     font-family: 'BeVietnamPro', system-ui, sans-serif;
     font-size: 16px;
     line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: 'HarmonyOSSans', 'BeVietnamPro', system-ui, sans-serif;
@@ -157,14 +160,14 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-}
-
-@layer base {
-  * {
-    @apply border-border;
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
   }
-
-  body {
-    @apply bg-background text-foreground;
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-area-mb {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
   }
 }

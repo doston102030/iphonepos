@@ -34,7 +34,6 @@ const debtSchema = z.object({
   customerName: z.string().min(1, 'Mijoz ismi kiritilishi shart'),
   customerPhone: z.string().min(1, 'Telefon raqami kiritilishi shart'),
   amount: z.coerce.number().min(1, 'Summa 0 dan katta bo\'lishi kerak'),
-  description: z.string().optional(),
 });
 
 const paySchema = z.object({
@@ -52,7 +51,7 @@ function DebtDialog({
 }) {
   const form = useForm<DebtForm>({
     resolver: zodResolver(debtSchema),
-    defaultValues: { customerName: '', customerPhone: '', amount: 0, description: '' },
+    defaultValues: { customerName: '', customerPhone: '', amount: 0 },
   });
 
   useEffect(() => {
@@ -61,10 +60,9 @@ function DebtDialog({
         customerName: debt.customerName,
         customerPhone: debt.customerPhone,
         amount: debt.amount,
-        description: debt.description ?? '',
       });
     } else {
-      form.reset({ customerName: '', customerPhone: '', amount: 0, description: '' });
+      form.reset({ customerName: '', customerPhone: '', amount: 0 });
     }
   }, [debt, open, form]);
 
@@ -111,13 +109,6 @@ function DebtDialog({
                 <FormItem className="sm:col-span-2">
                   <FormLabel>Summa (so'm)</FormLabel>
                   <FormControl><Input className="h-11" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem className="sm:col-span-2">
-                  <FormLabel>Tavsif (ixtiyoriy)</FormLabel>
-                  <FormControl><Input className="h-11" placeholder="Izoh..." {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -292,10 +283,12 @@ export default function DebtsPage() {
           title="Qarzlar"
           description="Mijoz qarzlarini boshqarish"
           action={
-            <Button size="sm" onClick={() => { setEditDebt(null); setDebtDialogOpen(true); }}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              Yangi qarz
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => { setEditDebt(null); setDebtDialogOpen(true); }}>
+                <Plus className="h-4 w-4" />
+                <span className="hidden">Yangi qarz</span>
+              </Button>
+            </div>
           }
         />
 

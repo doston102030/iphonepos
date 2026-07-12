@@ -133,7 +133,7 @@ function ProductDialog({
                     <div className="flex items-center gap-3">
                       <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">Nomi</FormLabel>
                       <FormControl>
-                        <Input placeholder="Masalan: Coca-Cola 0.5L"
+                        <Input placeholder="Masalan: Coca-Cola 0.5L" autoComplete="off"
                           className={ROW_INPUT_CLASS} {...field} />
                       </FormControl>
                     </div>
@@ -145,7 +145,7 @@ function ProductDialog({
                     <div className="flex items-center gap-2">
                       <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">Shtrix-kod</FormLabel>
                       <FormControl>
-                        <Input placeholder="1234567890123" className={ROW_INPUT_CLASS} {...field} />
+                        <Input placeholder="1234567890123" autoComplete="off" className={ROW_INPUT_CLASS} {...field} />
                       </FormControl>
                       <ScanButton onClick={() => setScannerOpen(true)} className="shrink-0 h-8 w-8" />
                     </div>
@@ -157,7 +157,7 @@ function ProductDialog({
                     <div className="flex items-center gap-3">
                       <FormLabel className="shrink-0 text-sm font-normal text-muted-foreground">O'lchov birligi</FormLabel>
                       <FormControl>
-                        <Input placeholder="dona" className={ROW_INPUT_CLASS} {...field} />
+                        <Input placeholder="dona" autoComplete="off" className={ROW_INPUT_CLASS} {...field} />
                       </FormControl>
                     </div>
                     <FormMessage className="text-right" />
@@ -565,11 +565,11 @@ export default function ProductsPage() {
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setReceiveOpen(true)}>
                 <PackageCheck className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Qabul qilish</span>
+                <span className="hidden">Qabul qilish</span>
               </Button>
               <Button size="sm" onClick={() => { setEditProduct(null); setProductDialogOpen(true); }}>
                 <Plus className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Yangi mahsulot</span>
+                <span className="hidden">Yangi mahsulot</span>
               </Button>
             </div>
           }

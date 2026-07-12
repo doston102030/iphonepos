@@ -166,8 +166,8 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
   };
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border safe-area-bottom">
-      <div className="flex items-stretch h-16">
+    <nav className="absolute bottom-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-xl border-t border-border safe-area-bottom pb-1">
+      <div className="flex items-stretch h-[3.5rem]">
         {bottomTabs.map(tab => {
           const Icon = tab.icon;
           const isActive = tab.path === '/'
@@ -179,7 +179,7 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
               key={tab.path}
               to={tab.path}
               className={cn(
-                'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
+                'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >
@@ -189,7 +189,7 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
               )}>
                 <Icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
                 {badge > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center shadow-sm">
                     {badge > 99 ? '99+' : badge}
                   </span>
                 )}
@@ -200,7 +200,7 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
         })}
         <button
           onClick={onMoreOpen}
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-muted-foreground"
         >
           <div className="flex items-center justify-center h-8 w-8 rounded-xl">
             <MoreHorizontal className="h-5 w-5" />
@@ -227,28 +227,25 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="p-0 rounded-t-2xl max-h-[80vh] overflow-y-auto">
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+      <SheetContent side="bottom" className="p-0 rounded-t-2xl max-h-[85vh] flex flex-col bg-sidebar border-t border-border">
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
         </div>
-        <div className="px-4 py-3 flex items-center gap-3 border-b border-border">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <span className="text-base font-bold text-primary">{user?.username?.[0]?.toUpperCase() ?? 'U'}</span>
+        
+        <div className="px-4 py-4 flex items-center gap-3 shrink-0">
+          <div className="h-12 w-12 rounded-full bg-gradient-primary flex items-center justify-center shadow-sm shrink-0">
+            <span className="text-xl font-bold text-white">{user?.username?.[0]?.toUpperCase() ?? 'U'}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">{user?.username}</p>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">{getRoleLabel(user?.role ?? '')}</Badge>
+            <p className="text-base font-bold text-sidebar-foreground truncate">{user?.username}</p>
+            <p className="text-xs font-medium text-muted-foreground truncate">{getRoleLabel(user?.role ?? '')}</p>
           </div>
-          <button
-            onClick={toggleTheme}
-            className="h-9 w-9 rounded-xl flex items-center justify-center bg-muted transition-colors shrink-0"
-          >
-            {theme === 'dark'
-              ? <Sun className="h-5 w-5 text-amber-400" />
-              : <Moon className="h-5 w-5 text-muted-foreground" />}
-          </button>
         </div>
-        <div className="px-3 py-2 space-y-1">
+
+        <div className="flex-1 overflow-y-auto px-3 space-y-1 pb-4">
+          <div className="mb-2 px-1">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Menyu</p>
+          </div>
           {moreItems.map(item => {
             const isActive = item.path === '/'
               ? location.pathname === '/'
@@ -258,23 +255,37 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
                 key={item.path}
                 onClick={() => handleNav(item.path)}
                 className={cn(
-                  'w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left',
-                  isActive ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
+                  'w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm font-medium transition-colors text-left',
+                  isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'
                 )}
               >
-                {item.icon}
+                {React.cloneElement(item.icon as React.ReactElement, { className: 'h-5 w-5' })}
                 <span>{item.label}</span>
               </button>
             );
           })}
-        </div>
-        <div className="px-3 pb-6 pt-1 border-t border-border mt-1">
+          
+          <div className="mt-4 mb-2 px-1 pt-2 border-t border-border/50">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tizim</p>
+          </div>
+          
+          <button
+            onClick={toggleTheme}
+            className="w-full flex items-center justify-between px-3 py-3.5 rounded-xl text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {theme === 'dark' ? <Sun className="h-5 w-5 text-amber-400" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
+              <span>Mavzuni o'zgartirish</span>
+            </div>
+            <span className="text-xs text-muted-foreground">{theme === 'dark' ? 'Qorong\'u' : 'Yorqin'}</span>
+          </button>
+
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left"
+            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left mt-2"
           >
-            <LogOut className="h-4 w-4" />
-            <span>Chiqish</span>
+            <LogOut className="h-5 w-5" />
+            <span>Tizimdan chiqish</span>
           </button>
         </div>
       </SheetContent>
@@ -283,7 +294,6 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [unpaidDebtsCount, setUnpaidDebtsCount] = useState(0);
   const { user } = useAuth();
@@ -296,47 +306,38 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
-      <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-sidebar-border">
-        <SidebarContent />
-      </aside>
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="p-0 w-60 bg-sidebar">
-          <SidebarContent onNavigate={() => setMobileOpen(false)} />
-        </SheetContent>
-      </Sheet>
-      <div className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
-        <header className="lg:hidden flex items-center gap-3 px-4 h-14 border-b border-border bg-background shrink-0 sticky top-0 z-30">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobileOpen(true)}>
-            <Menu className="h-4 w-4" />
-          </Button>
+    <div className="flex min-h-[100dvh] w-full bg-muted/30 justify-center">
+      <div className="flex-1 w-full max-w-[430px] flex flex-col bg-background relative sm:border-x sm:border-border sm:shadow-2xl overflow-hidden">
+        <header className="flex items-center justify-between gap-3 px-4 h-14 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30 safe-area-top">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="h-6 w-6 rounded bg-primary flex items-center justify-center shrink-0">
-              <ShoppingCart className="h-3 w-3 text-primary-foreground" />
+            <div className="h-7 w-7 rounded bg-gradient-primary flex items-center justify-center shrink-0 shadow-sm">
+              <ShoppingCart className="h-4 w-4 text-white" />
             </div>
-            <span className="text-sm font-bold truncate">NetDC Orders</span>
+            <span className="text-base font-bold truncate tracking-tight">NetDC Orders</span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <ThemeToggle />
             {user && (
-              <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-[10px] font-bold text-primary-foreground">
+              <button 
+                onClick={() => setMoreOpen(true)} 
+                className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center transition-colors hover:bg-primary/20"
+              >
+                <span className="text-[11px] font-bold text-primary">
                   {user.username?.[0]?.toUpperCase()}
                 </span>
-              </div>
+              </button>
             )}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+        <main className="flex-1 overflow-y-auto pb-20">
           {children}
         </main>
+        <MobileBottomNav
+          onMoreOpen={() => setMoreOpen(true)}
+          cartCount={totalCount}
+          unpaidDebtsCount={unpaidDebtsCount}
+        />
+        <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
       </div>
-      <MobileBottomNav
-        onMoreOpen={() => setMoreOpen(true)}
-        cartCount={totalCount}
-        unpaidDebtsCount={unpaidDebtsCount}
-      />
-      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
     </div>
   );
 }

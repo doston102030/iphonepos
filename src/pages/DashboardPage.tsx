@@ -105,18 +105,18 @@ export default function DashboardPage() {
         />
 
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-3 mb-6">
             {Array.from({ length: 4 }).map((_, i) => (
               <Card key={i} className="shadow-card">
-                <CardContent className="p-5">
-                  <Skeleton className="h-4 w-24 mb-3" />
-                  <Skeleton className="h-8 w-32" />
+                <CardContent className="p-4">
+                  <Skeleton className="h-4 w-20 mb-3" />
+                  <Skeleton className="h-6 w-24" />
                 </CardContent>
               </Card>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-3 mb-6">
             <KpiCard
               title="Bugungi savdo"
               value={formatCurrency(today?.totalRevenue ?? 0)}
@@ -142,8 +142,8 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
-          <Card className="shadow-card md:col-span-2">
+        <div className="grid grid-cols-1 gap-4 mb-6">
+          <Card className="shadow-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
                 <Target className="h-4 w-4 text-primary" /> Oylik maqsad
@@ -205,7 +205,7 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 gap-4 mb-6">
           <Card className="shadow-card">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Bu hafta</CardTitle></CardHeader>
             <CardContent>
@@ -232,7 +232,7 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 gap-4 mb-6">
           <Card className="shadow-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold">Bugungi to'lov turlari</CardTitle>
@@ -269,12 +269,12 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-card col-span-1 md:col-span-2">
+          <Card className="shadow-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold">Tezkor navigatsiya</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Yangi savdo', path: '/sell', icon: <ShoppingCart className="h-4 w-4" /> },
                   { label: 'Mahsulotlar', path: '/products', icon: <Package className="h-4 w-4" /> },

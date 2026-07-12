@@ -111,70 +111,69 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
-        <div className="flex justify-center pt-1 pb-3">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0">
+        <div className="flex justify-center pt-3 pb-2 shrink-0">
+          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
         </div>
-        <h3 className="text-base font-bold mb-3">Savatcha</h3>
-        <div className="space-y-2 mb-3 max-h-[26vh] overflow-y-auto">
+        <div className="px-4 pb-2 shrink-0">
+          <h3 className="text-lg font-bold">Savatcha</h3>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 space-y-2 mb-3">
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Savatcha bo'sh</p>
           ) : items.map(c => (
-            <div key={c.product.id} className="flex items-center gap-2 p-2 rounded-lg border border-border">
+            <div key={c.product.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-border bg-card shadow-sm">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{c.product.name}</p>
-                <p className="text-xs text-muted-foreground">{formatCurrency(c.product.price)} × {c.quantity}</p>
+                <p className="text-sm font-semibold truncate">{c.product.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(c.product.price)} × {c.quantity}</p>
               </div>
-              <p className="text-sm font-bold shrink-0">{formatCurrency(c.product.price * c.quantity)}</p>
+              <p className="text-sm font-bold shrink-0 text-accent">{formatCurrency(c.product.price * c.quantity)}</p>
             </div>
           ))}
         </div>
-        <Separator className="mb-3" />
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-            <FormField control={form.control} name="paymentType" render={({ field }) => (
-              <FormItem>
-                <FormLabel>To'lov turi</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="CASH">Naqd</SelectItem>
-                    <SelectItem value="CARD">Karta</SelectItem>
-                    <SelectItem value="DEBT">Qarz</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
-            {paymentType === 'DEBT' && (
-              <>
-                <FormField control={form.control} name="customerName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mijoz ismi</FormLabel>
-                    <FormControl><Input placeholder="Ism familiya" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="customerPhone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefon raqami</FormLabel>
-                    <FormControl><Input placeholder="+998901234567" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </>
-            )}
-            <Button
-              type="submit"
-              className="w-full h-12 rounded-xl text-base font-semibold"
-              disabled={form.formState.isSubmitting || items.length === 0}
-            >
-              {form.formState.isSubmitting ? 'Saqlanmoqda...' : `Tasdiqlash — ${formatCurrency(totalPrice)}`}
-            </Button>
-          </form>
-        </Form>
+        <div className="shrink-0 bg-background px-4 pb-6 pt-2 border-t border-border mt-auto">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="paymentType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground uppercase font-bold">To'lov turi</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="h-12 rounded-xl text-base font-semibold"><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="CASH" className="py-2.5 text-base font-semibold text-center">Naqd</SelectItem>
+                      <SelectItem value="CARD" className="py-2.5 text-base font-semibold text-center">Karta</SelectItem>
+                      <SelectItem value="DEBT" className="py-2.5 text-base font-semibold text-center">Qarz</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              {paymentType === 'DEBT' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField control={form.control} name="customerName" render={({ field }) => (
+                    <FormItem>
+                      <FormControl><Input className="h-11 rounded-xl bg-muted" placeholder="Ism familiya" autoComplete="off" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="customerPhone" render={({ field }) => (
+                    <FormItem>
+                      <FormControl><Input className="h-11 rounded-xl bg-muted" placeholder="+998901234567" autoComplete="off" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                </div>
+              )}
+              <Button
+                type="submit"
+                className="w-full h-14 rounded-2xl text-base font-bold shadow-hover mt-2"
+                disabled={form.formState.isSubmitting || items.length === 0}
+              >
+                {form.formState.isSubmitting ? 'Saqlanmoqda...' : `Tasdiqlash — ${formatCurrency(totalPrice)}`}
+              </Button>
+            </form>
+          </Form>
+        </div>
       </SheetContent>
     </Sheet>
   );
@@ -235,7 +234,7 @@ export default function SellPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {loading ? (
             Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[168px] rounded-xl" />)
           ) : products.length === 0 ? (
@@ -248,16 +247,18 @@ export default function SellPage() {
         <button
           type="button"
           onClick={() => setCheckoutOpen(true)}
-          className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 pl-4 pr-5 h-14 rounded-full bg-primary text-primary-foreground shadow-hover hover:opacity-90 transition-opacity"
+          className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm z-30 flex items-center justify-between px-5 h-14 rounded-2xl bg-primary text-primary-foreground shadow-card hover:opacity-95 transition-opacity"
         >
-          <span className="relative">
-            <ShoppingCart className="h-5 w-5" />
-            <span className="absolute -top-2 -right-2 h-4 min-w-4 px-1 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center">
-              {totalCount}
+          <div className="flex items-center gap-3">
+            <span className="relative flex items-center justify-center">
+              <ShoppingCart className="h-5 w-5" />
+              <span className="absolute -top-2 -right-2 h-4 min-w-4 px-1 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center shadow-sm">
+                {totalCount}
+              </span>
             </span>
-          </span>
-          <span className="font-semibold text-sm">Savatcha</span>
-          <span className="font-bold text-sm">{formatCurrency(totalPrice)}</span>
+            <span className="font-semibold text-sm">Savatcha</span>
+          </div>
+          <span className="font-bold text-base">{formatCurrency(totalPrice)}</span>
         </button>
       )}
 

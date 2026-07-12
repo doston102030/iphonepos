@@ -38,7 +38,7 @@ export function BarcodeScannerDialog({
 
     scanner.start(
       { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 260, height: 160 } },
+      { fps: 20, qrbox: { width: 280, height: 280 } },
       decodedText => {
         if (cancelled) return;
         cancelled = true;
@@ -58,29 +58,40 @@ export function BarcodeScannerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
+      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md p-4">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="rounded-lg overflow-hidden bg-black aspect-[4/3] flex items-center justify-center">
-          <div id={SCANNER_ELEMENT_ID} className="w-full" />
+        <div className="rounded-2xl overflow-hidden bg-black aspect-square flex items-center justify-center relative">
+          <div id={SCANNER_ELEMENT_ID} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
+          <div className="absolute inset-0 border-2 border-primary m-10 rounded-xl pointer-events-none" />
         </div>
         {error ? (
-          <p className="text-sm text-destructive text-center">{error}</p>
+          <p className="text-sm text-destructive text-center font-medium">{error}</p>
         ) : (
-          <p className="text-xs text-muted-foreground text-center">Kamerani shtrix-kodga qarating</p>
+          <p className="text-sm text-muted-foreground text-center font-medium">Kamerani shtrix-kodga qarating</p>
         )}
       </DialogContent>
     </Dialog>
   );
 }
 
+import { cn } from '@/lib/utils';
+
 export function ScanButton({
   onClick, className,
 }: { onClick: () => void; className?: string }) {
   return (
-    <Button type="button" variant="outline" size="icon" onClick={onClick} title="Skanerlash" className={className}>
-      <Camera className="h-4 w-4" />
+    <Button 
+      type="button" 
+      variant="outline" 
+      size="icon" 
+      onClick={onClick} 
+      title="Skanerlash" 
+      className={cn('h-11 w-11 rounded-xl shadow-sm border-border bg-card', className)}
+    >
+      <Camera className="h-5 w-5 text-primary" />
     </Button>
   );
 }
