@@ -277,7 +277,7 @@ export default function SellPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
           {loading ? (
             Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[168px] rounded-xl" />)
           ) : products.length === 0 ? (
@@ -290,7 +290,7 @@ export default function SellPage() {
         <button
           type="button"
           onClick={() => setCheckoutOpen(true)}
-          className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm z-30 flex items-center justify-between px-5 h-14 rounded-2xl bg-primary text-primary-foreground shadow-card hover:opacity-95 transition-opacity"
+          className="absolute bottom-[4.5rem] md:bottom-6 left-1/2 md:left-auto md:right-6 -translate-x-1/2 md:translate-x-0 w-[calc(100%-2rem)] max-w-sm z-30 flex items-center justify-between px-5 h-14 rounded-2xl bg-primary text-primary-foreground shadow-card hover:opacity-95 transition-opacity"
         >
           <div className="flex items-center gap-3">
             <span className="relative flex items-center justify-center">

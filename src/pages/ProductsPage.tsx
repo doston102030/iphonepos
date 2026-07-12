@@ -545,12 +545,12 @@ export default function ProductsPage() {
           action={
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setReceiveOpen(true)}>
-                <PackageCheck className="h-4 w-4 mr-1.5" />
-                <span className="hidden">Qabul qilish</span>
+                <PackageCheck className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Qabul qilish</span>
               </Button>
               <Button size="sm" onClick={() => { setEditProduct(null); setProductDialogOpen(true); }}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                <span className="hidden">Yangi mahsulot</span>
+                <Plus className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Yangi mahsulot</span>
               </Button>
             </div>
           }

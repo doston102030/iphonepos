@@ -269,7 +269,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
                   'h-12 w-12 rounded-2xl flex items-center justify-center',
                   isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground'
                 )}>
-                  {React.cloneElement(item.icon as React.ReactElement, { className: 'h-6 w-6' })}
+                  {React.cloneElement(item.icon as React.ReactElement<{ className?: string }>, { className: 'h-6 w-6' })}
                 </div>
                 <span className="text-xs font-bold text-center">{item.label}</span>
               </button>
@@ -305,8 +305,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex h-[100dvh] w-full bg-muted/30 justify-center overflow-hidden">
-      <div className="flex-1 w-full max-w-[430px] flex flex-col bg-background relative sm:border-x sm:border-border sm:shadow-2xl overflow-hidden">
-        <header className="flex items-center justify-between gap-3 px-4 h-14 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30 safe-area-top">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar shrink-0 z-20 shadow-xl">
+        <SidebarContent />
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 w-full flex flex-col bg-background relative md:max-w-none max-w-[430px] mx-auto md:mx-0 sm:border-x md:border-none sm:border-border sm:shadow-2xl md:shadow-none overflow-hidden transition-all duration-300">
+        <header className="md:hidden flex items-center justify-between gap-3 px-4 h-14 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30 safe-area-top">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className="h-7 w-7 rounded bg-gradient-primary flex items-center justify-center shrink-0 shadow-sm">
               <ShoppingCart className="h-4 w-4 text-white" />
@@ -326,14 +332,18 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             )}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto pb-24">
-          {children}
+        <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
+          <div className="mx-auto max-w-7xl w-full">
+            {children}
+          </div>
         </main>
-        <MobileBottomNav
-          onMoreOpen={() => setMoreOpen(true)}
-          cartCount={totalCount}
-          unpaidDebtsCount={unpaidDebtsCount}
-        />
+        <div className="md:hidden">
+          <MobileBottomNav
+            onMoreOpen={() => setMoreOpen(true)}
+            cartCount={totalCount}
+            unpaidDebtsCount={unpaidDebtsCount}
+          />
+        </div>
         <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
       </div>
     </div>

@@ -26,35 +26,69 @@ export function BarcodeScannerDialog({
   title?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
+    let isMounted = true;
+    let scanner: Html5Qrcode | null = null;
+    let started = false;
     setError(null);
-    const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID, {
-      verbose: false,
-      formatsToSupport: SUPPORTED_FORMATS,
-    });
 
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 20, qrbox: { width: 280, height: 280 } },
-      decodedText => {
-        if (cancelled) return;
-        cancelled = true;
-        onDetected(decodedText);
-        onOpenChange(false);
-      },
-      () => {},
-    ).catch(() => {
-      if (!cancelled) setError("Kameraga ruxsat berilmadi yoki kamera topilmadi. Qo'lda kiriting.");
-    });
+    const onSuccess = (decodedText: string) => {
+      if (!isMounted) return;
+      onDetected(decodedText);
+      onOpenChange(false);
+    };
+    const scanConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+    // Wait a bit for Dialog animation and DOM to settle
+    const timer = setTimeout(async () => {
+      if (!isMounted || !containerRef.current) return;
+
+      try {
+        scanner = new Html5Qrcode(containerRef.current.id, {
+          verbose: false,
+          formatsToSupport: SUPPORTED_FORMATS,
+        });
+
+        // Prefer the rear camera, but fall back to the front camera or any
+        // available device — many laptops/desktops only have one camera and
+        // reject an "environment" facingMode constraint outright.
+        try {
+          await scanner.start({ facingMode: 'environment' }, scanConfig, onSuccess, undefined);
+        } catch {
+          if (!isMounted) return;
+          try {
+            await scanner.start({ facingMode: 'user' }, scanConfig, onSuccess, undefined);
+          } catch {
+            if (!isMounted) return;
+            const cameras = await Html5Qrcode.getCameras().catch(() => []);
+            if (!isMounted) return;
+            if (cameras.length > 0) {
+              await scanner.start(cameras[0].id, scanConfig, onSuccess, undefined);
+            } else {
+              throw new Error('no-camera');
+            }
+          }
+        }
+        if (isMounted) started = true;
+      } catch (err) {
+        console.error('Scanner error:', err);
+        if (isMounted) setError("Kameraga ruxsat berilmadi yoki qurilma topilmadi. Shtrix-kodni qo'lda kiriting.");
+      }
+    }, 150);
 
     return () => {
-      cancelled = true;
-      scanner.stop().then(() => scanner.clear()).catch(() => {});
+      isMounted = false;
+      clearTimeout(timer);
+      if (scanner && started) {
+        scanner.stop().then(() => scanner?.clear()).catch(() => {
+          try { scanner?.clear(); } catch {}
+        });
+      }
     };
-  }, [open]);
+  }, [open, onDetected, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,7 +97,7 @@ export function BarcodeScannerDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="rounded-2xl overflow-hidden bg-black aspect-square flex items-center justify-center relative">
-          <div id={SCANNER_ELEMENT_ID} className="w-full h-full object-cover" />
+          <div id={SCANNER_ELEMENT_ID} ref={containerRef} className="w-full h-full object-cover" />
           <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
           <div className="absolute inset-0 border-2 border-primary m-10 rounded-xl pointer-events-none" />
         </div>

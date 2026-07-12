@@ -281,8 +281,8 @@ export default function DebtsPage() {
           action={
             <div className="flex gap-2">
               <Button size="sm" onClick={() => { setEditDebt(null); setDebtDialogOpen(true); }}>
-                <Plus className="h-4 w-4" />
-                <span className="hidden">Yangi qarz</span>
+                <Plus className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Yangi qarz</span>
               </Button>
             </div>
           }

@@ -7,15 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle
-} from '@/components/ui/dialog';
-import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { PaginationControls } from '@/components/common/PaginationControls';
+import { MobileOverlay } from '@/components/common/MobileOverlay';
 import {
   ordersApi, type OrderResponse, extractContent, extractPage
 } from '@/lib/api';
@@ -161,39 +159,38 @@ export default function OrdersPage() {
         </Card>
       </div>
 
-      {/* View Order Dialog */}
-      <Dialog open={!!viewOrder} onOpenChange={o => !o && setViewOrder(null)}>
-        <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Buyurtma #{viewOrder?.id}</DialogTitle>
-          </DialogHeader>
-          {viewOrder && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                <div><span className="text-muted-foreground">Kassir:</span> <span className="font-medium">{viewOrder.cashierName}</span></div>
-                <div><span className="text-muted-foreground">Sana:</span> <span className="font-medium">{formatDateTime(viewOrder.createdAt)}</span></div>
-                <div><span className="text-muted-foreground">To'lov:</span> <Badge variant={viewOrder.paymentType === 'DEBT' ? 'destructive' : 'default'}>{getPaymentTypeLabel(viewOrder.paymentType)}</Badge></div>
-                {viewOrder.customerName && <div><span className="text-muted-foreground">Mijoz:</span> <span className="font-medium">{viewOrder.customerName}</span></div>}
-                {viewOrder.customerPhone && <div><span className="text-muted-foreground">Telefon:</span> <span className="font-medium">{viewOrder.customerPhone}</span></div>}
-              </div>
-              <Separator />
-              <div className="space-y-1">
-                {(viewOrder.items ?? []).map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span>{item.productName} × {item.quantity}</span>
-                    <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
-                  </div>
-                ))}
-              </div>
-              <Separator />
-              <div className="flex justify-between font-bold">
-                <span>Jami:</span>
-                <span className="text-accent">{formatCurrency(viewOrder.totalPrice)}</span>
-              </div>
+      {/* View Order Overlay */}
+      <MobileOverlay
+        open={!!viewOrder}
+        onOpenChange={o => !o && setViewOrder(null)}
+        title={`Buyurtma #${viewOrder?.id ?? ''}`}
+      >
+        {viewOrder && (
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              <div><span className="text-muted-foreground">Kassir:</span> <span className="font-medium">{viewOrder.cashierName}</span></div>
+              <div><span className="text-muted-foreground">Sana:</span> <span className="font-medium">{formatDateTime(viewOrder.createdAt)}</span></div>
+              <div><span className="text-muted-foreground">To'lov:</span> <Badge variant={viewOrder.paymentType === 'DEBT' ? 'destructive' : 'default'}>{getPaymentTypeLabel(viewOrder.paymentType)}</Badge></div>
+              {viewOrder.customerName && <div><span className="text-muted-foreground">Mijoz:</span> <span className="font-medium">{viewOrder.customerName}</span></div>}
+              {viewOrder.customerPhone && <div><span className="text-muted-foreground">Telefon:</span> <span className="font-medium">{viewOrder.customerPhone}</span></div>}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            <Separator />
+            <div className="space-y-1">
+              {(viewOrder.items ?? []).map((item, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span>{item.productName} × {item.quantity}</span>
+                  <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
+                </div>
+              ))}
+            </div>
+            <Separator />
+            <div className="flex justify-between font-bold">
+              <span>Jami:</span>
+              <span className="text-accent">{formatCurrency(viewOrder.totalPrice)}</span>
+            </div>
+          </div>
+        )}
+      </MobileOverlay>
     </MainLayout>
   );
 }

@@ -4,13 +4,11 @@ import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
-} from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
@@ -27,6 +25,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { PaginationControls } from '@/components/common/PaginationControls';
+import { MobileOverlay } from '@/components/common/MobileOverlay';
 import {
   usersApi, type UserResponse, extractContent, extractPage
 } from '@/lib/api';
@@ -77,55 +76,53 @@ function UserDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{user ? 'Foydalanuvchini tahrirlash' : 'Yangi foydalanuvchi'}</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="username" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Username</FormLabel>
-                <FormControl><Input className="h-11" placeholder="username" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="pin" render={({ field }) => (
-              <FormItem>
-                <FormLabel>PIN kod{user ? ' (yangilash uchun kiriting)' : ''}</FormLabel>
+    <MobileOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title={user ? 'Foydalanuvchini tahrirlash' : 'Yangi foydalanuvchi'}
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-5 h-full flex flex-col">
+          <FormField control={form.control} name="username" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Username</FormLabel>
+              <FormControl><Input className="h-11" placeholder="username" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="pin" render={({ field }) => (
+            <FormItem>
+              <FormLabel>PIN kod{user ? ' (yangilash uchun kiriting)' : ''}</FormLabel>
+              <FormControl>
+                <Input className="h-11" type="password" inputMode="numeric" placeholder="PIN kod" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="role" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Rol</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <Input className="h-11" type="password" inputMode="numeric" placeholder="PIN kod" {...field} />
+                  <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="role" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Rol</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="KASSIR">Kassir</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                    <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>Bekor qilish</Button>
-              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+                <SelectContent>
+                  <SelectItem value="KASSIR">Kassir</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <div className="pt-4 pb-6 mt-auto">
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </MobileOverlay>
   );
 }
 
@@ -139,6 +136,7 @@ export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { isSuperAdmin, user: currentUser } = useAuth();
+  const isMobile = useIsMobile();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -203,6 +201,58 @@ export default function UsersPage() {
 
         <Card className="shadow-card">
           <CardContent className="p-0">
+            {isMobile ? (
+              <div className="divide-y divide-border">
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="p-4"><Skeleton className="h-14 w-full" /></div>
+                  ))
+                ) : users.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground text-sm">Foydalanuvchi topilmadi</p>
+                ) : users.map(u => (
+                  <div key={u.id} className="p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{u.username}</p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Badge variant={getRoleBadgeVariant(u.role)}>{getRoleLabel(u.role)}</Badge>
+                          <Badge variant={u.active ? 'default' : 'outline'}>
+                            {u.active ? 'Faol' : 'Nofaol'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{formatDateTime(u.createdAt)}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost" size="icon" className="h-9 w-9"
+                          title={u.active ? 'Nofaol qilish' : 'Faollashtirish'}
+                          onClick={() => handleToggle(u)}
+                          disabled={u.username === currentUser?.username}
+                        >
+                          {u.active
+                            ? <ToggleRight className="h-4 w-4 text-primary" />
+                            : <ToggleLeft className="h-4 w-4 text-muted-foreground" />
+                          }
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9"
+                          title="Tahrirlash"
+                          onClick={() => { setEditUser(u); setDialogOpen(true); }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive"
+                          title="O'chirish"
+                          disabled={u.username === currentUser?.username}
+                          onClick={() => setDeleteId(u.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -276,6 +326,7 @@ export default function UsersPage() {
                 </TableBody>
               </Table>
             </div>
+            )}
             <div className="px-4 pb-3">
               <PaginationControls
                 page={page} totalPages={totalPages}

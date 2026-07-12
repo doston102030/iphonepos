@@ -4,15 +4,13 @@ import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
-} from '@/components/ui/dialog';
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage
 } from '@/components/ui/form';
@@ -21,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
+import { MobileOverlay } from '@/components/common/MobileOverlay';
 import {
   smsApi, type SmsCampaignResponse, type SmsBalanceResponse
 } from '@/lib/api';
@@ -68,51 +67,47 @@ function SendSmsDialog({ open, onOpenChange, onSaved }: {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-lg">
-        <DialogHeader><DialogTitle>SMS yuborish</DialogTitle></DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="campaignName" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Kampaniya nomi (ixtiyoriy)</FormLabel>
-                <FormControl><Input className="h-11" placeholder="Kampaniya nomi..." {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="message" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Xabar matni</FormLabel>
-                <FormControl>
-                  <Textarea placeholder="SMS xabar matni..." rows={3} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="phones" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Telefon raqamlar (vergul yoki yangi qator bilan ajrating)</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="+998901234567&#10;+998901234568"
-                    rows={3}
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>Bekor qilish</Button>
-              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>
-                <Send className="h-4 w-4 mr-1.5" />
-                {form.formState.isSubmitting ? 'Yuborilmoqda...' : 'Yuborish'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title="SMS yuborish">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-5 h-full flex flex-col">
+          <FormField control={form.control} name="campaignName" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Kampaniya nomi (ixtiyoriy)</FormLabel>
+              <FormControl><Input className="h-11" placeholder="Kampaniya nomi..." {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="message" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Xabar matni</FormLabel>
+              <FormControl>
+                <Textarea placeholder="SMS xabar matni..." rows={3} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="phones" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Telefon raqamlar (vergul yoki yangi qator bilan ajrating)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="+998901234567&#10;+998901234568"
+                  rows={3}
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <div className="pt-4 pb-6 mt-auto">
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>
+              <Send className="h-4 w-4 mr-1.5" />
+              {form.formState.isSubmitting ? 'Yuborilmoqda...' : 'Yuborish'}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </MobileOverlay>
   );
 }
 
@@ -121,6 +116,7 @@ export default function SmsPage() {
   const [balance, setBalance] = useState<SmsBalanceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [sendOpen, setSendOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   async function loadData() {
     setLoading(true);
@@ -181,6 +177,33 @@ export default function SmsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
+            {isMobile ? (
+              <div className="divide-y divide-border">
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="p-4"><Skeleton className="h-14 w-full" /></div>
+                  ))
+                ) : campaigns.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground text-sm">Kampaniya yo'q</p>
+                ) : campaigns.map(c => (
+                  <div key={c.id} className="p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{c.campaignName ?? `#${c.id}`}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.message}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs text-muted-foreground">{c.phones?.length ?? 0} ta</p>
+                        <Badge variant={c.delivered ? 'default' : 'secondary'} className="mt-1">
+                          {c.delivered ? 'Yuborildi' : 'Mock'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1.5">{formatDateTime(c.createdAt)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -229,6 +252,7 @@ export default function SmsPage() {
                 </TableBody>
               </Table>
             </div>
+            )}
           </CardContent>
         </Card>
       </div>

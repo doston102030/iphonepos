@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Filter } from 'lucide-react';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,7 @@ export default function StockMovementsPage() {
   const [appliedFilters, setAppliedFilters] = useState<{
     from?: string; to?: string; type?: string;
   }>({});
+  const isMobile = useIsMobile();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,6 +127,33 @@ export default function StockMovementsPage() {
 
         <Card className="shadow-card">
           <CardContent className="p-0">
+            {isMobile ? (
+              <div className="divide-y divide-border">
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="p-4"><Skeleton className="h-14 w-full" /></div>
+                  ))
+                ) : movements.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground text-sm">Harakat topilmadi</p>
+                ) : movements.map(m => (
+                  <div key={m.id} className="p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{m.productName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{formatDateTime(m.createdAt)}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold">{m.quantity}</p>
+                        <Badge variant={typeBadgeVariant(m.type)} className="mt-1">
+                          {getStockMovementTypeLabel(m.type)}
+                        </Badge>
+                      </div>
+                    </div>
+                    {m.note && <p className="text-xs text-muted-foreground mt-1.5 truncate">{m.note}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -169,6 +198,7 @@ export default function StockMovementsPage() {
                 </TableBody>
               </Table>
             </div>
+            )}
             <div className="px-4 pb-3">
               <PaginationControls
                 page={page} totalPages={totalPages}

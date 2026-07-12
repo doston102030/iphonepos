@@ -23,7 +23,7 @@ export function MobileOverlay({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className={cn(
-          "fixed inset-0 z-50 flex flex-col w-full max-w-[430px] mx-auto h-[100dvh] bg-background border-0 sm:border-x sm:border-border rounded-none p-0 overflow-hidden shadow-2xl transition-transform duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+          "fixed inset-x-0 bottom-0 top-0 z-50 flex flex-col w-full max-w-[430px] mx-auto md:mx-0 md:left-auto md:right-0 h-[100dvh] bg-background border-0 sm:border-x md:border-x-0 md:border-l sm:border-border rounded-none p-0 overflow-hidden shadow-2xl transition-transform duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom md:data-[state=closed]:slide-out-to-right md:data-[state=open]:slide-in-from-right !translate-x-0 !translate-y-0",
           className
         )}
         hideCloseButton
