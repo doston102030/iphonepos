@@ -283,10 +283,13 @@ export default function SellPage() {
       </div>
 
       {totalCount > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-32 md:hidden bg-gradient-to-t from-muted/30 via-muted/20 to-transparent pointer-events-none z-20" />
+      )}
+      {totalCount > 0 && (
         <button
           type="button"
           onClick={() => setCheckoutOpen(true)}
-          className="absolute bottom-[4.5rem] md:bottom-6 left-1/2 md:left-auto md:right-6 -translate-x-1/2 md:translate-x-0 w-[calc(100%-2rem)] max-w-sm z-30 flex items-center justify-between px-5 h-14 rounded-2xl bg-primary text-primary-foreground shadow-card hover:opacity-95 transition-opacity"
+          className="absolute bottom-[4.5rem] md:bottom-6 left-1/2 md:left-auto md:right-6 -translate-x-1/2 md:translate-x-0 w-[calc(100%-2rem)] max-w-sm z-30 flex items-center justify-between px-5 h-14 rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-primary/30 ring-1 ring-black/5 hover:opacity-95 transition-opacity"
         >
           <div className="flex items-center gap-3">
             <span className="relative flex items-center justify-center">

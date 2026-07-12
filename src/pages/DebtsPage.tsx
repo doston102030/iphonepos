@@ -170,10 +170,10 @@ function PayDialog({
         <div className="flex-1 flex flex-col justify-center px-6 py-4 shrink-0 min-h-[150px]">
           <p className="text-sm text-muted-foreground mb-3 text-center">To'lov miqdori (so'm)</p>
           <div className="flex items-center justify-center gap-1.5 border-b-2 border-border/50 pb-2 bg-muted/30 p-4 rounded-3xl mx-4">
-            <span className="text-3xl text-muted-foreground font-light">$</span>
             <span className="text-4xl font-bold tracking-tighter text-foreground truncate">
               {amountStr === '' ? '0' : parseInt(amountStr, 10).toLocaleString('ru-RU')}
             </span>
+            <span className="text-lg text-muted-foreground font-medium">so'm</span>
           </div>
         </div>
 

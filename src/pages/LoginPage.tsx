@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Logo } from '@/components/common/Logo';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -46,10 +47,7 @@ export default function LoginPage() {
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col items-center justify-center p-12">
         <div className="max-w-sm w-full text-center">
-          <div className="h-16 w-16 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-6">
-            <ShoppingCart className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-3">NetDC Orders</h1>
+          <img src="/logo-dark.png" alt="inPOS" className="h-12 w-auto object-contain mx-auto mb-6" />
           <p className="text-white/70 text-base leading-relaxed">
             Mahsulot, buyurtma, qarz va hisobotlarni boshqarish uchun professional tizim
           </p>
@@ -67,11 +65,8 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 bg-background">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
-          <div className="flex lg:hidden items-center gap-2 justify-center mb-8">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
-              <ShoppingCart className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold">NetDC Orders</span>
+          <div className="flex lg:hidden items-center justify-center mb-8">
+            <Logo className="h-8" />
           </div>
 
           <div className="mb-8">

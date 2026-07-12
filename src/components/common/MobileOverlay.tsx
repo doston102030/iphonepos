@@ -29,13 +29,13 @@ export function MobileOverlay({
         hideCloseButton
       >
         <div className="flex items-center justify-between px-2 h-14 shrink-0 border-b border-border bg-background/90 backdrop-blur-md safe-area-top z-10">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-10 w-10 shrink-0 text-primary hover:bg-primary/10 rounded-full" 
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 shrink-0 text-primary bg-primary/10 hover:bg-primary/20 rounded-full"
             onClick={() => onOpenChange(false)}
           >
-            <ChevronLeft className="h-7 w-7" />
+            <ChevronLeft className="h-6 w-6" />
           </Button>
           
           <DialogTitle className="flex-1 text-center text-lg font-bold truncate px-2 tracking-tight">

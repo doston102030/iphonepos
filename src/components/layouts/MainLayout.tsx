@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { Logo } from '@/components/common/Logo';
 import { cn, getRoleLabel } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -116,12 +117,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex flex-col h-full bg-sidebar">
       <div className="px-4 py-5 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center shrink-0">
-            <ShoppingCart className="h-4 w-4 text-primary-foreground" />
-          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-sidebar-foreground truncate leading-tight">NetDC Orders</p>
-            <p className="text-xs text-muted-foreground truncate">Boshqaruv paneli</p>
+            <Logo className="h-6" />
+            <p className="text-xs text-muted-foreground truncate mt-1">Boshqaruv paneli</p>
           </div>
           <ThemeToggle />
         </div>
@@ -310,10 +308,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <div className="flex-1 w-full flex flex-col bg-background relative md:max-w-none max-w-[430px] mx-auto md:mx-0 sm:border-x md:border-none sm:border-border sm:shadow-2xl md:shadow-none overflow-hidden transition-all duration-300">
         <header className="md:hidden flex items-center justify-between gap-3 px-4 h-14 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30 safe-area-top">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="h-7 w-7 rounded bg-gradient-primary flex items-center justify-center shrink-0 shadow-sm">
-              <ShoppingCart className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-base font-bold truncate tracking-tight">NetDC Orders</span>
+            <Logo className="h-6" />
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {user && (
