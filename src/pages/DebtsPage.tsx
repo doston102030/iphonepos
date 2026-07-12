@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, DollarSign, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign, Search, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,7 +28,7 @@ import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
-  debtsApi, type DebtResponse, extractContent, extractPage
+  debtsApi, type DebtResponse, type DebtPaymentResponse, extractContent, extractPage
 } from '@/lib/api';
 import { cn, formatCurrency, formatDateTime, getDebtStatusLabel } from '@/lib/utils';
 
@@ -130,11 +130,7 @@ function PayDialog({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (open && debt) {
-      setAmountStr(debt.remainingAmount.toString());
-    } else {
-      setAmountStr('');
-    }
+    setAmountStr('');
   }, [open, debt]);
 
   async function handlePay() {
@@ -203,6 +199,72 @@ function PayDialog({
   );
 }
 
+function PaymentHistoryDialog({
+  open, onOpenChange, debt
+}: {
+  open: boolean; onOpenChange: (v: boolean) => void; debt: DebtResponse | null;
+}) {
+  const [payments, setPayments] = useState<DebtPaymentResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && debt) {
+      setLoading(true);
+      debtsApi.getPayments(debt.id)
+        .then(setPayments)
+        .catch(() => toast.error("To'lovlar tarixi yuklanmadi"))
+        .finally(() => setLoading(false));
+    } else {
+      setPayments([]);
+    }
+  }, [open, debt]);
+
+  return (
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title="To'lovlar tarixi">
+      <div className="p-4">
+        {debt && (
+          <div className="bg-muted/50 rounded-2xl p-4 mb-4 grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <p className="text-muted-foreground mb-0.5">Umumiy</p>
+              <p className="font-bold text-foreground">{formatCurrency(debt.amount)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-0.5">To'langan</p>
+              <p className="font-bold text-success">{formatCurrency(debt.paidAmount)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-0.5">Qoldi</p>
+              <p className="font-bold text-destructive">{formatCurrency(debt.remainingAmount)}</p>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-2xl" />)}
+          </div>
+        ) : payments.length === 0 ? (
+          <p className="text-center py-8 text-muted-foreground text-sm">Hali to'lov qilinmagan</p>
+        ) : (
+          <div className="space-y-2">
+            {payments.map(p => (
+              <div key={p.id} className="flex items-center gap-3 p-3.5 rounded-2xl bg-muted/30 border border-border/50">
+                <div className="h-9 w-9 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
+                  <Calendar className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold">{formatCurrency(p.amount)}</p>
+                  <p className="text-xs text-muted-foreground">{formatDateTime(p.createdAt)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </MobileOverlay>
+  );
+}
+
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === 'PAID') return 'default';
   if (status === 'PARTIAL') return 'secondary';
@@ -231,6 +293,8 @@ export default function DebtsPage() {
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [payDebt, setPayDebt] = useState<DebtResponse | null>(null);
   const [payOpen, setPayOpen] = useState(false);
+  const [historyDebt, setHistoryDebt] = useState<DebtResponse | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'UNPAID' | 'PARTIAL' | 'PAID'>('UNPAID');
   const [search, setSearch] = useState('');
@@ -371,6 +435,10 @@ export default function DebtsPage() {
                     <span className="text-[11px] text-muted-foreground font-medium">{formatDateTime(d.createdAt)}</span>
                     <div className="flex items-center gap-1.5">
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        title="To'lovlar tarixi" onClick={() => { setHistoryDebt(d); setHistoryOpen(true); }}>
+                        <Calendar className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted text-muted-foreground hover:text-foreground"
                         title="Tahrirlash" onClick={() => { setEditDebt(d); setDebtDialogOpen(true); }}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -451,6 +519,10 @@ export default function DebtsPage() {
                               </Button>
                             )}
                             <Button variant="ghost" size="icon" className="h-7 w-7"
+                              title="To'lovlar tarixi" onClick={() => { setHistoryDebt(d); setHistoryOpen(true); }}>
+                              <Calendar className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"
                               title="Tahrirlash" onClick={() => { setEditDebt(d); setDebtDialogOpen(true); }}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
@@ -479,6 +551,7 @@ export default function DebtsPage() {
 
       <DebtDialog open={debtDialogOpen} onOpenChange={setDebtDialogOpen} debt={editDebt} onSaved={load} />
       <PayDialog open={payOpen} onOpenChange={setPayOpen} debt={payDebt} onSaved={load} />
+      <PaymentHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} debt={historyDebt} />
 
       <AlertDialog open={deleteId !== null} onOpenChange={o => !o && setDeleteId(null)}>
         <AlertDialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">

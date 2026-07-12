@@ -46,8 +46,6 @@ const kassirMoreItems: NavItem[] = [
   { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" /> },
   { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
   { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
-  { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" /> },
-  { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
 ];
 
 const adminMoreItems: NavItem[] = [
@@ -55,9 +53,7 @@ const adminMoreItems: NavItem[] = [
   { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
   { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
   { label: 'Foyda / Zarar', path: '/profit', icon: <TrendingUp className="h-4 w-4" />, roles: ['ADMIN', 'SUPER_ADMIN'] },
-  { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" /> },
   { label: 'Foydalanuvchilar', path: '/users', icon: <Users className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
-  { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
 ];
 
 function ThemeToggle({ className }: { className?: string }) {

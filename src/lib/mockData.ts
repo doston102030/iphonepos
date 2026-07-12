@@ -1,6 +1,6 @@
 import type {
   LoginResponse, UserResponse, ProductResponse, OrderResponse, OrderItemResponse,
-  DebtResponse, StockMovementResponse, SmsCampaignResponse, SmsBalanceResponse,
+  DebtResponse, DebtPaymentResponse, StockMovementResponse, SmsCampaignResponse, SmsBalanceResponse,
   SalesReportResponse, DailySalesResponse, UserSalesResponse, ProfitByProductResponse,
   InventorySummaryResponse, SettingsResponse, PagedResponse,
 } from './api';
@@ -100,6 +100,16 @@ let mockDebts: DebtResponse[] = [
   { id: 4, customerName: 'Eldor Toshmatov', customerPhone: '+998901445566', amount: 50000, paidAmount: 20000, remainingAmount: 30000, status: 'PARTIAL', description: undefined, createdAt: daysAgoISO(6, 14) },
 ];
 let nextDebtId = 5;
+
+let mockDebtPayments: Record<number, DebtPaymentResponse[]> = {
+  1: [{ id: 1, amount: 50000, createdAt: daysAgoISO(15, 12) }],
+  2: [
+    { id: 2, amount: 40000, createdAt: daysAgoISO(20, 10) },
+    { id: 3, amount: 45000, createdAt: daysAgoISO(9, 16, 30) },
+  ],
+  4: [{ id: 4, amount: 20000, createdAt: daysAgoISO(2, 11) }],
+};
+let nextPaymentId = 5;
 
 // ── Mock stock movements ────────────────────────────────────────────────────
 let mockMovements: StockMovementResponse[] = [
@@ -318,9 +328,12 @@ export const mockDebtsApi = {
       d.paidAmount = Math.min(d.amount, d.paidAmount + body.amount);
       d.remainingAmount = d.amount - d.paidAmount;
       d.status = d.remainingAmount === 0 ? 'PAID' : 'PARTIAL';
+      const payments = mockDebtPayments[id] ?? (mockDebtPayments[id] = []);
+      payments.push({ id: nextPaymentId++, amount: body.amount, createdAt: new Date().toISOString() });
     }
     return delay(mockDebts[idx]);
   },
+  getPayments: (id: number) => delay([...(mockDebtPayments[id] ?? [])].reverse()),
 };
 
 // ── STOCK MOVEMENTS ───────────────────────────────────────────────────────────

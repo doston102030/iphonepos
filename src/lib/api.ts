@@ -150,6 +150,7 @@ export interface DebtRequest {
   customerName: string; customerPhone: string; amount: number; description?: string;
 }
 export interface DebtPayRequest { amount: number }
+export interface DebtPaymentResponse { id: number; amount: number; createdAt: string }
 
 export const debtsApi = USE_MOCK ? mockDebtsApi : {
   getAll: (page = 0, size = 20) =>
@@ -158,6 +159,7 @@ export const debtsApi = USE_MOCK ? mockDebtsApi : {
   update: (id: number, body: DebtRequest) => request<DebtResponse>('PUT', `/api/debts/${id}`, body),
   delete: (id: number) => request<void>('DELETE', `/api/debts/${id}`),
   pay: (id: number, body: DebtPayRequest) => request<DebtResponse>('PUT', `/api/debts/${id}/pay`, body),
+  getPayments: (id: number) => request<DebtPaymentResponse[]>('GET', `/api/debts/${id}/payments`),
 };
 
 // ─── Stock Movements ─────────────────────────────────────────────────────────

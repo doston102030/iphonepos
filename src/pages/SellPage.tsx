@@ -162,10 +162,6 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
             ))}
           </div>
 
-          <div className="bg-warning/10 border border-warning/20 rounded-2xl p-4 text-warning-foreground text-sm font-medium">
-            <p>Eng ko'pi {formatCurrency(totalPrice)} gacha chegirma qila olasiz. (tannarxdan pastga sota olmaysiz)</p>
-          </div>
-
           <Form {...form}>
             <form id="checkout-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div>
