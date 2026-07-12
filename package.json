@@ -84,6 +84,7 @@
     "@types/react-dom": "^19.2.2",
     "@types/video-react": "^0.15.8",
     "@typescript/native-preview": "7.0.0-dev.20260514.1",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.6",
