@@ -166,8 +166,8 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
   };
 
   return (
-    <nav className="absolute bottom-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-xl border-t border-border safe-area-bottom pb-1">
-      <div className="flex items-stretch h-[3.5rem]">
+    <nav className="absolute bottom-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-xl border-t border-border shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.1)] safe-area-bottom">
+      <div className="flex items-stretch h-[4.5rem]">
         {bottomTabs.map(tab => {
           const Icon = tab.icon;
           const isActive = tab.path === '/'
@@ -179,31 +179,31 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
               key={tab.path}
               to={tab.path}
               className={cn(
-                'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors',
-                isActive ? 'text-primary' : 'text-muted-foreground'
+                'flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-bold transition-all',
+                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <div className={cn(
-                'relative flex items-center justify-center h-8 w-8 rounded-xl transition-all',
-                isActive ? 'bg-primary/10 scale-110' : ''
+                'relative flex items-center justify-center h-10 w-10 rounded-2xl transition-all duration-300',
+                isActive ? 'bg-primary/10 scale-110 shadow-sm' : ''
               )}>
-                <Icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                <Icon className={cn('h-6 w-6 transition-transform', isActive ? 'text-primary scale-110' : 'text-muted-foreground')} />
                 {badge > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center shadow-sm">
+                  <span className="absolute -top-1.5 -right-1.5 h-5 min-w-5 px-1.5 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center shadow-md border-2 border-background">
                     {badge > 99 ? '99+' : badge}
                   </span>
                 )}
               </div>
-              <span>{tab.label}</span>
+              <span className={cn('transition-all duration-300', isActive ? 'translate-y-0.5' : '')}>{tab.label}</span>
             </Link>
           );
         })}
         <button
           onClick={onMoreOpen}
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-muted-foreground"
+          className="flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-all"
         >
-          <div className="flex items-center justify-center h-8 w-8 rounded-xl">
-            <MoreHorizontal className="h-5 w-5" />
+          <div className="flex items-center justify-center h-10 w-10 rounded-2xl transition-all duration-300">
+            <MoreHorizontal className="h-6 w-6" />
           </div>
           <span>Ko'proq</span>
         </button>
@@ -306,7 +306,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="flex min-h-[100dvh] w-full bg-muted/30 justify-center">
+    <div className="flex h-[100dvh] w-full bg-muted/30 justify-center overflow-hidden">
       <div className="flex-1 w-full max-w-[430px] flex flex-col bg-background relative sm:border-x sm:border-border sm:shadow-2xl overflow-hidden">
         <header className="flex items-center justify-between gap-3 px-4 h-14 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30 safe-area-top">
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -328,7 +328,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             )}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto pb-20">
+        <main className="flex-1 overflow-y-auto pb-24">
           {children}
         </main>
         <MobileBottomNav
