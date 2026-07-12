@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+.env
+.env.*
+
+.sync
+history
+historical_context.txt
+.skills
+
+.DS_Store
+*.log

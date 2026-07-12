@@ -1,0 +1,170 @@
+/* stylelint-disable */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'HarmonyOSSans';
+  src: url('https://resource-static.bj.bcebos.com/fonts-skill/HarmonyOSSans_Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'BeVietnamPro';
+  src: url('https://resource-static.bj.bcebos.com/fonts-skill/BeVietnamPro_Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'BeVietnamPro';
+  src: url('https://resource-static.bj.bcebos.com/fonts-skill/BeVietnamPro_Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'BeVietnamPro';
+  src: url('https://resource-static.bj.bcebos.com/fonts-skill/BeVietnamPro_SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    /* Swiss Grid × Enterprise SaaS - CRM palette */
+    --background: 30 6% 98%;
+    --foreground: 222 47% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 8%;
+    --primary: 258 84% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 258 90% 69%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 258 20% 95%;
+    --muted-foreground: 240 8% 46%;
+    --accent: 38 92% 44%;
+    --accent-foreground: 222 47% 8%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 258 15% 89%;
+    --input: 258 15% 89%;
+    --ring: 258 84% 63%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 44%;
+    --info: 258 84% 63%;
+    --chart-1: 258 84% 63%;
+    --chart-2: 38 92% 44%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 199 89% 55%;
+    --chart-5: 0 84% 60%;
+    --sidebar-background: 258 25% 97%;
+    --sidebar-foreground: 222 47% 8%;
+    --sidebar-primary: 258 84% 63%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 258 25% 92%;
+    --sidebar-accent-foreground: 222 47% 8%;
+    --sidebar-border: 258 15% 89%;
+    --sidebar-ring: 258 84% 63%;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-hover: 0 4px 12px rgba(0,0,0,0.10);
+    --gradient-primary: linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%);
+    --gradient-card: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+    --gradient-background: linear-gradient(180deg, #fafaf9 0%, #f2f0ec 100%);
+  }
+
+  .dark {
+    --background: 258 20% 10%;
+    --foreground: 210 30% 94%;
+    --card: 258 20% 13%;
+    --card-foreground: 210 30% 94%;
+    --popover: 258 20% 13%;
+    --popover-foreground: 210 30% 94%;
+    --primary: 258 85% 68%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 258 80% 62%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 258 20% 18%;
+    --muted-foreground: 258 12% 65%;
+    --accent: 38 85% 48%;
+    --accent-foreground: 222 47% 8%;
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 258 20% 22%;
+    --input: 258 20% 22%;
+    --ring: 258 85% 68%;
+    --success: 142 60% 40%;
+    --warning: 38 85% 48%;
+    --info: 258 85% 68%;
+    --chart-1: 258 85% 68%;
+    --chart-2: 38 85% 48%;
+    --chart-3: 142 60% 40%;
+    --chart-4: 199 85% 60%;
+    --chart-5: 0 62% 45%;
+    --sidebar-background: 258 20% 8%;
+    --sidebar-foreground: 210 30% 90%;
+    --sidebar-primary: 258 85% 68%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 258 20% 15%;
+    --sidebar-accent-foreground: 210 30% 90%;
+    --sidebar-border: 258 20% 18%;
+    --sidebar-ring: 258 85% 68%;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-hover: 0 4px 12px rgba(0,0,0,0.4);
+    --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+    --gradient-card: linear-gradient(180deg, hsl(258 20% 13%) 0%, hsl(258 20% 11%) 100%);
+    --gradient-background: linear-gradient(180deg, hsl(258 20% 10%) 0%, hsl(258 20% 8%) 100%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'BeVietnamPro', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'HarmonyOSSans', 'BeVietnamPro', system-ui, sans-serif;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+}
+
+@layer utilities {
+  .kpi-number {
+    font-family: 'HarmonyOSSans', system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  @media (min-width: 640px) {
+    .kpi-number {
+      font-size: 2rem;
+      line-height: 1.1;
+    }
+  }
+  .gradient-text {
+    background-image: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

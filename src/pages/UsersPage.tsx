@@ -1,0 +1,308 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+} from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import {
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage
+} from '@/components/ui/form';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
+import { PaginationControls } from '@/components/common/PaginationControls';
+import {
+  usersApi, type UserResponse, extractContent, extractPage
+} from '@/lib/api';
+import { formatDateTime, getRoleBadgeVariant, getRoleLabel } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+
+const userSchema = z.object({
+  username: z.string().min(1, 'Username kiritilishi shart'),
+  pin: z.string().min(4, 'PIN kod kamida 4 ta raqam bo\'lishi kerak'),
+  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'KASSIR']),
+});
+
+type UserForm = z.infer<typeof userSchema>;
+
+function UserDialog({
+  open, onOpenChange, user, onSaved
+}: {
+  open: boolean; onOpenChange: (v: boolean) => void;
+  user: UserResponse | null; onSaved: () => void;
+}) {
+  const form = useForm<UserForm>({
+    resolver: zodResolver(userSchema),
+    defaultValues: { username: '', pin: '', role: 'KASSIR' },
+  });
+
+  useEffect(() => {
+    if (user) {
+      form.reset({ username: user.username, pin: '', role: user.role as 'SUPER_ADMIN' | 'ADMIN' | 'KASSIR' });
+    } else {
+      form.reset({ username: '', pin: '', role: 'KASSIR' });
+    }
+  }, [user, open, form]);
+
+  async function onSubmit(values: UserForm) {
+    try {
+      if (user) {
+        await usersApi.update(user.id, values);
+        toast.success('Foydalanuvchi yangilandi');
+      } else {
+        await usersApi.create(values);
+        toast.success('Foydalanuvchi yaratildi');
+      }
+      onSaved();
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Xato yuz berdi');
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{user ? 'Foydalanuvchini tahrirlash' : 'Yangi foydalanuvchi'}</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="username" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Username</FormLabel>
+                <FormControl><Input className="h-11" placeholder="username" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="pin" render={({ field }) => (
+              <FormItem>
+                <FormLabel>PIN kod{user ? ' (yangilash uchun kiriting)' : ''}</FormLabel>
+                <FormControl>
+                  <Input className="h-11" type="password" inputMode="numeric" placeholder="PIN kod" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="role" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Rol</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="KASSIR">Kassir</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button type="button" variant="outline" className="flex-1 rounded-xl h-11" onClick={() => onOpenChange(false)}>Bekor qilish</Button>
+              <Button type="submit" className="flex-1 rounded-xl h-11" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function UsersPage() {
+  const [users, setUsers] = useState<UserResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+  const [editUser, setEditUser] = useState<UserResponse | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const { isSuperAdmin, user: currentUser } = useAuth();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await usersApi.getAll(page, 20);
+      setUsers(extractContent(res));
+      const pg = extractPage(res);
+      setTotalPages(pg.totalPages);
+      setTotalElements(pg.totalElements);
+    } catch { toast.error('Foydalanuvchilar yuklanmadi'); }
+    finally { setLoading(false); }
+  }, [page]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleToggle(u: UserResponse) {
+    try {
+      await usersApi.toggleStatus(u.id, !u.active);
+      toast.success('Holat o\'zgartirildi');
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Xato');
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteId) return;
+    try {
+      await usersApi.delete(deleteId);
+      toast.success("Foydalanuvchi o'chirildi");
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Xato');
+    } finally { setDeleteId(null); }
+  }
+
+  if (!isSuperAdmin) {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            Bu sahifaga kirish huquqingiz yo'q
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  return (
+    <MainLayout>
+      <div className="p-6">
+        <PageHeader
+          title="Foydalanuvchilar"
+          description="Kassirlar va adminlarni boshqarish"
+          action={
+            <Button size="sm" onClick={() => { setEditUser(null); setDialogOpen(true); }}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Yangi foydalanuvchi
+            </Button>
+          }
+        />
+
+        <Card className="shadow-card">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Username</TableHead>
+                    <TableHead className="whitespace-nowrap">Rol</TableHead>
+                    <TableHead className="whitespace-nowrap">Holat</TableHead>
+                    <TableHead className="whitespace-nowrap">Yaratilgan</TableHead>
+                    <TableHead className="whitespace-nowrap text-right">Amallar</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {Array.from({ length: 5 }).map((__, j) => (
+                          <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
+                        Foydalanuvchi topilmadi
+                      </TableCell>
+                    </TableRow>
+                  ) : users.map(u => (
+                    <TableRow key={u.id}>
+                      <TableCell className="whitespace-nowrap font-medium">{u.username}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Badge variant={getRoleBadgeVariant(u.role)}>{getRoleLabel(u.role)}</Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Badge variant={u.active ? 'default' : 'outline'}>
+                          {u.active ? 'Faol' : 'Nofaol'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        {formatDateTime(u.createdAt)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7"
+                            title={u.active ? 'Nofaol qilish' : 'Faollashtirish'}
+                            onClick={() => handleToggle(u)}
+                            disabled={u.username === currentUser?.username}
+                          >
+                            {u.active
+                              ? <ToggleRight className="h-3.5 w-3.5 text-primary" />
+                              : <ToggleLeft className="h-3.5 w-3.5 text-muted-foreground" />
+                            }
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7"
+                            title="Tahrirlash"
+                            onClick={() => { setEditUser(u); setDialogOpen(true); }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                            title="O'chirish"
+                            disabled={u.username === currentUser?.username}
+                            onClick={() => setDeleteId(u.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="px-4 pb-3">
+              <PaginationControls
+                page={page} totalPages={totalPages}
+                totalElements={totalElements} size={20}
+                onPageChange={setPage}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <UserDialog open={dialogOpen} onOpenChange={setDialogOpen} user={editUser} onSaved={load} />
+
+      <AlertDialog open={deleteId !== null} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Foydalanuvchini o'chirish</AlertDialogTitle>
+            <AlertDialogDescription>Bu amalni qaytarib bo'lmaydi.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              O'chirish
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </MainLayout>
+  );
+}
