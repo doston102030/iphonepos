@@ -328,73 +328,84 @@ export default function DebtsPage() {
           />
         </div>
 
-        <Card className="shadow-card">
-          <CardContent className="p-0">
-            {isMobile ? (
-              <div className="divide-y divide-border">
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="p-4"><Skeleton className="h-20 w-full" /></div>
-                  ))
-                ) : filteredDebts.length === 0 ? (
-                  <p className="text-center py-8 text-muted-foreground text-sm">Qarz topilmadi</p>
-                ) : filteredDebts.map(d => {
-                  const paidPct = d.amount > 0 ? Math.round((d.paidAmount / d.amount) * 100) : 0;
-                  return (
-                  <div key={d.id} className="p-3.5">
-                    <div className="flex items-start gap-3 mb-2">
-                      <div className="h-9 w-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
-                        <DollarSign className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold truncate">{d.customerName}</p>
-                        <p className="text-xs text-muted-foreground">{d.customerPhone}</p>
-                      </div>
-                      <span className={cn('shrink-0 text-[11px] font-semibold px-2 py-1 rounded-full', statusPillClasses(d.status))}>
-                        {getDebtStatusLabel(d.status)}
-                      </span>
+        {isMobile ? (
+          <>
+            <div className="space-y-3 pb-4">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i} className="shadow-sm"><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
+              ))
+            ) : filteredDebts.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">Qarz topilmadi</p>
+            ) : filteredDebts.map(d => {
+              const paidPct = d.amount > 0 ? Math.round((d.paidAmount / d.amount) * 100) : 0;
+              return (
+              <Card key={d.id} className="shadow-sm border-border overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="h-10 w-10 rounded-full bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
+                      <DollarSign className="h-5 w-5" />
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs mb-2">
-                      <div>
-                        <p className="text-muted-foreground">Umumiy</p>
-                        <p className="font-semibold">{formatCurrency(d.amount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">To'langan</p>
-                        <p className="font-semibold text-success">{formatCurrency(d.paidAmount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Qoldi</p>
-                        <p className="font-bold text-destructive">{formatCurrency(d.remainingAmount)}</p>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-bold truncate tracking-tight">{d.customerName}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{d.customerPhone}</p>
                     </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-2">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${paidPct}%` }} />
+                    <span className={cn('shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full', statusPillClasses(d.status))}>
+                      {getDebtStatusLabel(d.status)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs mb-3 bg-muted/50 p-2.5 rounded-xl">
+                    <div>
+                      <p className="text-muted-foreground mb-0.5">Umumiy</p>
+                      <p className="font-bold text-foreground">{formatCurrency(d.amount)}</p>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">{formatDateTime(d.createdAt)}</span>
-                      <div className="flex items-center gap-1.5">
-                        <Button variant="ghost" size="icon" className="h-8 w-8"
-                          title="Tahrirlash" onClick={() => { setEditDebt(d); setDebtDialogOpen(true); }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
-                          title="O'chirish" onClick={() => setDeleteId(d.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                        {d.remainingAmount > 0 && (
-                          <Button size="sm" className="h-8 rounded-lg bg-success hover:bg-success/90 text-white"
-                            onClick={() => { setPayDebt(d); setPayOpen(true); }}>
-                            To'lash
-                          </Button>
-                        )}
-                      </div>
+                    <div>
+                      <p className="text-muted-foreground mb-0.5">To'langan</p>
+                      <p className="font-bold text-success">{formatCurrency(d.paidAmount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-0.5">Qoldi</p>
+                      <p className="font-bold text-destructive">{formatCurrency(d.remainingAmount)}</p>
                     </div>
                   </div>
-                  );
-                })}
-              </div>
-            ) : (
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-3">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${paidPct}%` }} />
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-muted-foreground font-medium">{formatDateTime(d.createdAt)}</span>
+                    <div className="flex items-center gap-1.5">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        title="Tahrirlash" onClick={() => { setEditDebt(d); setDebtDialogOpen(true); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                        title="O'chirish" onClick={() => setDeleteId(d.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      {d.remainingAmount > 0 && (
+                        <Button size="sm" className="h-8 rounded-xl bg-success hover:bg-success/90 text-white font-bold ml-1 shadow-sm"
+                          onClick={() => { setPayDebt(d); setPayOpen(true); }}>
+                          To'lash
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              );
+            })}
+          </div>
+          <div className="py-2">
+            <PaginationControls
+              page={page} totalPages={totalPages}
+              totalElements={totalElements} size={20}
+              onPageChange={setPage}
+            />
+          </div>
+        </>
+        ) : (
+          <Card className="shadow-card">
+            <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -458,16 +469,16 @@ export default function DebtsPage() {
                   </TableBody>
                 </Table>
               </div>
-            )}
-            <div className="px-4 pb-3">
-              <PaginationControls
-                page={page} totalPages={totalPages}
-                totalElements={totalElements} size={20}
-                onPageChange={setPage}
-              />
-            </div>
-          </CardContent>
-        </Card>
+              <div className="px-4 pb-3">
+                <PaginationControls
+                  page={page} totalPages={totalPages}
+                  totalElements={totalElements} size={20}
+                  onPageChange={setPage}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <DebtDialog open={debtDialogOpen} onOpenChange={setDebtDialogOpen} debt={editDebt} onSaved={load} />

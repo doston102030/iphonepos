@@ -590,64 +590,75 @@ export default function ProductsPage() {
           <Button variant="outline" onClick={handleSearch}>Qidirish</Button>
         </div>
 
-        <Card className="shadow-card">
-          <CardContent className="p-0">
-            {isMobile ? (
-              <div className="divide-y divide-border">
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="p-4"><Skeleton className="h-16 w-full" /></div>
-                  ))
-                ) : products.length === 0 ? (
-                  <p className="text-center py-8 text-muted-foreground text-sm">Mahsulot topilmadi</p>
-                ) : products.map(p => (
-                  <div key={p.id} className="p-3.5">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold truncate">
-                          {p.name}
-                          {p.quantity <= p.minQuantity && (
-                            <Badge variant="destructive" className="ml-1.5 text-[10px] align-middle">Kam</Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground font-mono">{p.barcode}</p>
+        {isMobile ? (
+          <>
+            <div className="space-y-3 pb-4">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i} className="shadow-sm"><CardContent className="p-4"><Skeleton className="h-16 w-full" /></CardContent></Card>
+              ))
+            ) : products.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">Mahsulot topilmadi</p>
+            ) : products.map(p => (
+              <Card key={p.id} className="shadow-sm border-border overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="min-w-0">
+                      <div className="text-base font-bold truncate tracking-tight text-foreground">
+                        {p.name}
+                        {p.quantity <= p.minQuantity && (
+                          <Badge variant="destructive" className="ml-2 text-[10px] align-middle px-1.5 py-0 h-4">Kam</Badge>
+                        )}
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-bold text-accent">{formatCurrency(p.price)}</p>
-                        <p className="text-[11px] text-muted-foreground">tan narx {formatCurrency(p.costPrice)}</p>
-                      </div>
+                      <p className="text-xs text-muted-foreground font-mono mt-0.5">{p.barcode}</p>
                     </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        Qoldiq: <span className="font-semibold text-foreground">{p.quantity} {p.unit}</span>
-                      </span>
-                      <div className="flex items-center gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-8 w-8"
-                          title="Restock" onClick={() => { setRestockProduct(p); setRestockOpen(true); }}>
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"
-                          title="Chiqim" onClick={() => { setOutflowProduct(p); setOutflowOpen(true); }}>
-                          <PackageMinus className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"
-                          title="Tarix" onClick={() => { setHistoryProduct(p); setHistoryOpen(true); }}>
-                          <History className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"
-                          title="Tahrirlash" onClick={() => { setEditProduct(p); setProductDialogOpen(true); }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
-                          title="O'chirish" onClick={() => setDeleteId(p.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-accent">{formatCurrency(p.price)}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">tan narx {formatCurrency(p.costPrice)}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
+                  <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                    <span className="text-xs text-muted-foreground font-medium">
+                      Qoldiq: <span className="font-bold text-foreground">{p.quantity} {p.unit}</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        title="Restock" onClick={() => { setRestockProduct(p); setRestockOpen(true); }}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        title="Chiqim" onClick={() => { setOutflowProduct(p); setOutflowOpen(true); }}>
+                        <PackageMinus className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        title="Tarix" onClick={() => { setHistoryProduct(p); setHistoryOpen(true); }}>
+                        <History className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        title="Tahrirlash" onClick={() => { setEditProduct(p); setProductDialogOpen(true); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                        title="O'chirish" onClick={() => setDeleteId(p.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="py-2">
+            <PaginationControls
+              page={page} totalPages={totalPages}
+              totalElements={totalElements} size={30}
+              onPageChange={setPage}
+            />
+          </div>
+        </>
+        ) : (
+          <Card className="shadow-card">
+            <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -720,16 +731,16 @@ export default function ProductsPage() {
                   </TableBody>
                 </Table>
               </div>
-            )}
-            <div className="px-4 pb-3">
-              <PaginationControls
-                page={page} totalPages={totalPages}
-                totalElements={totalElements} size={30}
-                onPageChange={setPage}
-              />
-            </div>
-          </CardContent>
-        </Card>
+              <div className="px-4 pb-3">
+                <PaginationControls
+                  page={page} totalPages={totalPages}
+                  totalElements={totalElements} size={30}
+                  onPageChange={setPage}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <ProductDialog
