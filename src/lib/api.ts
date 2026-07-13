@@ -1,11 +1,26 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://orders.netdc.uz';
-// Mock ma'lumotlar faqat local/demo muhit uchun aniq yoqilganda ishlatiladi.
+// API layer for the "Orders Doston API" (OpenAPI v1.0, https://api.netdc.uz).
+//
+// Types here mirror the server contract exactly. Where the UI needs a value the
+// server does not send, it is DERIVED here from fields that do exist (and
+// commented as such) — never invented. If a number cannot be derived, it is not
+// exposed, so no screen can quietly render a fake zero.
+//
+// In dev, /api goes through the vite proxy (see vite.config.ts), so BASE_URL is
+// relative. In production the app talks to the backend directly.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? '' : 'https://api.netdc.uz');
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 import {
   mockAuthApi, mockUsersApi, mockProductsApi, mockOrdersApi,
   mockDebtsApi, mockStockMovementsApi, mockReportsApi, mockSmsApi, mockSettingsApi,
 } from './mockData';
+
+/** The server's default "low stock" cutoff (GET /api/products/low-stock). */
+export const LOW_STOCK_THRESHOLD = 5;
+
+/** PIN is validated server-side against `\d{4}`. */
+export const PIN_PATTERN = /^\d{4}$/;
 
 function getToken(): string | null {
   return localStorage.getItem('token');
@@ -15,9 +30,9 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  params?: Record<string, string | number | undefined>
+  params?: Record<string, string | number | boolean | undefined>
 ): Promise<T> {
-  const url = new URL(`${BASE_URL}${path}`);
+  const url = new URL(`${BASE_URL}${path}`, window.location.origin);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null && value !== '') {
@@ -27,430 +42,357 @@ async function request<T>(
   }
 
   const token = getToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   let response: Response;
   try {
     response = await fetch(url.toString(), {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error('Server bilan bog\'lanib bo\'lmadi. Internet aloqasini tekshiring.');
+    throw new Error("Server bilan bog'lanib bo'lmadi. Internet aloqasini tekshiring.");
   }
 
-  if (response.status === 401) {
+  // A 401 on the login call means "wrong PIN", not "session expired" — bouncing
+  // to /login there would reload the page and wipe the error before it renders.
+  const isLoginRequest = path === '/api/auth/login';
+
+  if (response.status === 401 && !isLoginRequest) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
     throw new Error('Sessiya tugadi. Iltimos qayta kiring.');
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
+  if (response.status === 204) return undefined as T;
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message = data?.message || data?.error || `Xato: ${response.status}`;
-    throw new Error(message);
+    if (data?.message || data?.error) throw new Error(data.message || data.error);
+    if (response.status === 401 && isLoginRequest) throw new Error("PIN noto'g'ri");
+    if (response.status === 429) throw new Error("Juda ko'p urinish. Bir necha daqiqa kutib, qaytadan urinib ko'ring.");
+    if (response.status === 403) throw new Error("Bu amal uchun huquqingiz yo'q.");
+    if (response.status === 404) throw new Error("Ma'lumot topilmadi.");
+    if (response.status === 501) throw new Error('Bu xizmat hali ulanmagan.');
+    if (response.status >= 500) throw new Error("Server javob bermayapti. Birozdan so'ng qaytadan urinib ko'ring.");
+    throw new Error(`Xato: ${response.status}`);
   }
 
   return data as T;
 }
 
-type ApiRole = 'SUPER_ADMIN' | 'CASHIER';
-type ApiUser = { id: number; fullName: string; role: ApiRole; active: boolean };
-type ApiProduct = { id: number; name: string; barcode?: string; purchasePrice: number; price: number; stockQuantity: number };
+// ─── Pagination ──────────────────────────────────────────────────────────────
+// Spring's PagedModel: { content: [...], page: { size, number, totalElements, totalPages } }
+export interface PageMetadata {
+  size: number; number: number; totalElements: number; totalPages: number;
+}
+export interface PagedResponse<T> {
+  content?: T[];
+  page?: PageMetadata;
+}
 
-function mapRoleFromApi(role: ApiRole): string { return role === 'CASHIER' ? 'KASSIR' : role; }
-function mapRoleToApi(role: string): ApiRole { return role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'CASHIER'; }
-function mapPaymentFromApi(payment: string): string { return payment === 'CREDIT' ? 'DEBT' : payment; }
-function mapPaymentToApi(payment: string): 'CASH' | 'CARD' | 'CREDIT' { return payment === 'DEBT' ? 'CREDIT' : payment === 'CARD' ? 'CARD' : 'CASH'; }
-function mapPage<T, R>(page: PagedResponse<T>, mapper: (item: T) => R): PagedResponse<R> {
+export function extractContent<T>(data: PagedResponse<T>): T[] {
+  return data.content ?? [];
+}
+
+export function extractPage(data: PagedResponse<unknown>) {
   return {
-    content: (page.content ?? []).map(mapper),
-    page: page.page,
-    totalElements: page.totalElements,
-    totalPages: page.totalPages,
-    number: page.number,
-    size: page.size,
+    totalElements: data.page?.totalElements ?? 0,
+    totalPages: data.page?.totalPages ?? 1,
+    number: data.page?.number ?? 0,
+    size: data.page?.size ?? 20,
   };
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
+/** The server only knows these two roles — there is no ADMIN. */
+export type Role = 'SUPER_ADMIN' | 'CASHIER';
+
 export interface LoginRequest { pin: string }
-export interface LoginResponse { token: string; role: string; username: string }
+export interface LoginResponse { id: number; token: string; fullName: string; role: Role }
+export interface MeResponse { id: number; fullName: string; role: Role }
 
 export const authApi = USE_MOCK ? mockAuthApi : {
-  login: async (body: LoginRequest) => {
-    const data = await request<{ token: string; fullName: string; role: ApiRole }>('POST', '/api/auth/login', body);
-    return { token: data.token, username: data.fullName, role: mapRoleFromApi(data.role) };
-  },
+  login: (body: LoginRequest) => request<LoginResponse>('POST', '/api/auth/login', body),
+  /** Verifies a stored token is still valid (used on app boot). */
+  me: () => request<MeResponse>('GET', '/api/auth/me'),
 };
 
 // ─── Users ───────────────────────────────────────────────────────────────────
-export interface UserResponse {
-  id: number; username: string; role: string; active: boolean; createdAt: string;
-}
-export interface UserRequest { username: string; pin: string; role: string }
+export interface UserRequest { pin: string; fullName: string; role: Role }
+export interface UserResponse { id: number; fullName: string; role: Role; active: boolean }
 export interface UserStatusRequest { active: boolean }
 
 export const usersApi = USE_MOCK ? mockUsersApi : {
-  getAll: async (page = 0, size = 20) => mapPage(
-    await request<PagedResponse<ApiUser>>('GET', '/api/users', undefined, { page, size }),
-    user => ({ id: user.id, username: user.fullName, role: mapRoleFromApi(user.role), active: user.active, createdAt: '' }),
-  ),
-  getById: async (id: number) => {
-    const user = await request<ApiUser>('GET', `/api/users/${id}`);
-    return { id: user.id, username: user.fullName, role: mapRoleFromApi(user.role), active: user.active, createdAt: '' };
-  },
-  create: async (body: UserRequest) => {
-    const user = await request<ApiUser>('POST', '/api/users', { fullName: body.username, pin: body.pin, role: mapRoleToApi(body.role) });
-    return { id: user.id, username: user.fullName, role: mapRoleFromApi(user.role), active: user.active, createdAt: '' };
-  },
-  update: async (id: number, body: UserRequest) => {
-    const user = await request<ApiUser>('PUT', `/api/users/${id}`, { fullName: body.username, pin: body.pin, role: mapRoleToApi(body.role) });
-    return { id: user.id, username: user.fullName, role: mapRoleFromApi(user.role), active: user.active, createdAt: '' };
-  },
+  getAll: (page = 0, size = 20) =>
+    request<PagedResponse<UserResponse>>('GET', '/api/users', undefined, { page, size }),
+  getById: (id: number) => request<UserResponse>('GET', `/api/users/${id}`),
+  create: (body: UserRequest) => request<UserResponse>('POST', '/api/users', body),
+  update: (id: number, body: UserRequest) => request<UserResponse>('PUT', `/api/users/${id}`, body),
   delete: (id: number) => request<void>('DELETE', `/api/users/${id}`),
-  toggleStatus: async (id: number, active: boolean) => {
-    const user = await request<ApiUser>('PATCH', `/api/users/${id}/status`, { active });
-    return { id: user.id, username: user.fullName, role: mapRoleFromApi(user.role), active: user.active, createdAt: '' };
-  },
+  toggleStatus: (id: number, active: boolean) =>
+    request<UserResponse>('PATCH', `/api/users/${id}/status`, { active } satisfies UserStatusRequest),
 };
 
 // ─── Products ────────────────────────────────────────────────────────────────
-export interface ProductResponse {
-  id: number; name: string; barcode: string; price: number; costPrice: number;
-  quantity: number; unit: string; minQuantity: number; createdAt: string;
-}
+// The server has no `unit` or `minQuantity` per product; "dona" is a UI word and
+// low stock is decided by LOW_STOCK_THRESHOLD, matching /api/products/low-stock.
 export interface ProductRequest {
-  name: string; barcode: string; price: number; costPrice: number;
-  quantity: number; unit: string; minQuantity: number;
+  name: string; barcode?: string;
+  purchasePrice: number; price: number; stockQuantity: number;
 }
-export interface RestockRequest { quantity: number; note?: string }
-export interface OutflowRequest { quantity: number; reason: string }
+export interface ProductResponse {
+  id: number; name: string; barcode?: string;
+  purchasePrice: number; price: number; stockQuantity: number;
+}
+
+export interface RestockRequest { quantity: number }
+
+export type OutflowReason = 'DAMAGED' | 'LOST' | 'RETURNED';
+export interface OutflowRequest { quantity: number; reason: OutflowReason; note?: string }
+export interface OutflowResponse {
+  id: number; productName: string; quantity: number;
+  reason: OutflowReason; note?: string; createdAt: string;
+}
+
 export interface StockReceiveRequest {
-  barcode: string; name?: string; quantity: number; price?: number; costPrice?: number; unit?: string;
+  barcode: string; name?: string;
+  purchasePrice: number; price: number; quantity: number;
+}
+
+export interface BarcodeLookupResponse {
+  barcode: string; found: boolean; name?: string; brand?: string;
 }
 
 export const productsApi = USE_MOCK ? mockProductsApi : {
-  getAll: async (search?: string, page = 0, size = 30) => mapPage(
-    await request<PagedResponse<ApiProduct>>('GET', '/api/products', undefined, { search, page, size }),
-    product => ({ id: product.id, name: product.name, barcode: product.barcode ?? '', price: product.price, costPrice: product.purchasePrice, quantity: product.stockQuantity, unit: 'dona', minQuantity: 0, createdAt: '' }),
-  ),
-  getById: async (id: number) => {
-    const product = await request<ApiProduct>('GET', `/api/products/${id}`);
-    return { id: product.id, name: product.name, barcode: product.barcode ?? '', price: product.price, costPrice: product.purchasePrice, quantity: product.stockQuantity, unit: 'dona', minQuantity: 0, createdAt: '' };
-  },
-  getByBarcode: async (barcode: string) => {
-    const product = await request<ApiProduct>('GET', `/api/products/barcode/${encodeURIComponent(barcode)}`);
-    return { id: product.id, name: product.name, barcode: product.barcode ?? '', price: product.price, costPrice: product.purchasePrice, quantity: product.stockQuantity, unit: 'dona', minQuantity: 0, createdAt: '' };
-  },
-  create: async (body: ProductRequest) => {
-    const product = await request<ApiProduct>('POST', '/api/products', { name: body.name, barcode: body.barcode, purchasePrice: body.costPrice, price: body.price, stockQuantity: body.quantity });
-    return { id: product.id, name: product.name, barcode: product.barcode ?? '', price: product.price, costPrice: product.purchasePrice, quantity: product.stockQuantity, unit: 'dona', minQuantity: 0, createdAt: '' };
-  },
-  update: async (id: number, body: ProductRequest) => {
-    const product = await request<ApiProduct>('PUT', `/api/products/${id}`, { name: body.name, barcode: body.barcode, purchasePrice: body.costPrice, price: body.price, stockQuantity: body.quantity });
-    return { id: product.id, name: product.name, barcode: product.barcode ?? '', price: product.price, costPrice: product.purchasePrice, quantity: product.stockQuantity, unit: 'dona', minQuantity: 0, createdAt: '' };
-  },
+  getAll: (search?: string, page = 0, size = 30) =>
+    request<PagedResponse<ProductResponse>>('GET', '/api/products', undefined, { search, page, size }),
+  getById: (id: number) => request<ProductResponse>('GET', `/api/products/${id}`),
+  getByBarcode: (barcode: string) =>
+    request<ProductResponse>('GET', `/api/products/barcode/${encodeURIComponent(barcode)}`),
+  /** Falls back to an external catalogue when the barcode isn't in our DB. */
+  externalLookup: (barcode: string) =>
+    request<BarcodeLookupResponse>('GET', `/api/products/barcode/${encodeURIComponent(barcode)}/external-lookup`),
+  lowStock: (threshold = LOW_STOCK_THRESHOLD, page = 0, size = 30) =>
+    request<PagedResponse<ProductResponse>>('GET', '/api/products/low-stock', undefined, { threshold, page, size }),
+  create: (body: ProductRequest) => request<ProductResponse>('POST', '/api/products', body),
+  update: (id: number, body: ProductRequest) => request<ProductResponse>('PUT', `/api/products/${id}`, body),
   delete: (id: number) => request<void>('DELETE', `/api/products/${id}`),
-  restock: async (id: number, body: RestockRequest) => {
-    const product = await request<ApiProduct>('POST', `/api/products/${id}/restock`, { quantity: body.quantity });
-    return { id: product.id, name: product.name, barcode: product.barcode ?? '', price: product.price, costPrice: product.purchasePrice, quantity: product.stockQuantity, unit: 'dona', minQuantity: 0, createdAt: '' };
-  },
-  createOutflow: async (id: number, body: OutflowRequest) => {
-    const payload = {
-      quantity: body.quantity,
-      reason: ['DAMAGED', 'LOST', 'RETURNED'].includes(body.reason) ? body.reason : 'DAMAGED',
-      note: body.reason
-    };
-    const data = await request<any>('POST', `/api/products/${id}/outflow`, payload);
-    return { id: data.id, productName: data.productName, quantity: data.quantity, reason: data.reason, createdAt: data.createdAt };
-  },
-  receive: async (body: StockReceiveRequest) => {
-    const product = await request<ApiProduct>('POST', '/api/products/receive', { barcode: body.barcode, name: body.name, purchasePrice: body.costPrice ?? 0, price: body.price ?? 0, quantity: body.quantity });
-    return { id: product.id, name: product.name, barcode: product.barcode ?? '', price: product.price, costPrice: product.purchasePrice, quantity: product.stockQuantity, unit: 'dona', minQuantity: 0, createdAt: '' };
-  },
-  restockHistory: async (id: number) => (await request<any[]>('GET', `/api/products/${id}/restock-history`)).map(item => ({ id: item.id, productName: item.productName, type: item.type, quantity: item.quantity, note: item.reason, createdAt: item.createdAt })),
+  restock: (id: number, body: RestockRequest) =>
+    request<ProductResponse>('POST', `/api/products/${id}/restock`, body),
+  createOutflow: (id: number, body: OutflowRequest) =>
+    request<OutflowResponse>('POST', `/api/products/${id}/outflow`, body),
+  receive: (body: StockReceiveRequest) =>
+    request<ProductResponse>('POST', '/api/products/receive', body),
+  restockHistory: (id: number) =>
+    request<StockMovementResponse[]>('GET', `/api/products/${id}/restock-history`),
+};
+
+export const outflowsApi = {
+  getAll: (page = 0, size = 20) =>
+    request<PagedResponse<OutflowResponse>>('GET', '/api/outflows', undefined, { page, size }),
 };
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
-export interface OrderItem { productId: number; quantity: number }
+export type PaymentMethod = 'CASH' | 'CARD' | 'MIXED' | 'CREDIT';
+
+export interface OrderItemRequest { productId: number; quantity: number }
 export interface OrderRequest {
-  items: OrderItem[]; paymentType: 'CASH' | 'CARD' | 'DEBT';
-  customerName?: string; customerPhone?: string;
+  items: OrderItemRequest[];
+  paymentMethod: PaymentMethod;
+  discountAmount?: number;
+  customerName?: string;
+  customerPhone?: string;
+  paidAmount?: number;
 }
-export interface OrderItemResponse { productId: number; productName: string; quantity: number; price: number; costPrice: number }
+export interface OrderItemResponse {
+  productName: string; quantity: number; unitPrice: number; profit: number;
+}
 export interface OrderResponse {
-  id: number; items: OrderItemResponse[]; totalPrice: number;
-  paymentType: string; cashierName: string; createdAt: string;
-  customerName?: string; customerPhone?: string;
+  id: number;
+  subtotal: number;
+  discountAmount: number;
+  totalAmount: number;
+  createdAt: string;
+  paymentMethod: PaymentMethod;
+  items: OrderItemResponse[];
 }
 
 export const ordersApi = USE_MOCK ? mockOrdersApi : {
-  getAll: async (page = 0, size = 20) => {
-    const res = await request<PagedResponse<any>>('GET', '/api/orders', undefined, { page, size });
-    return mapPage(res, order => ({
-      id: order.id,
-      items: order.items.map((i: any) => ({
-        productId: 0,
-        productName: i.productName,
-        quantity: i.quantity,
-        price: i.unitPrice,
-        costPrice: i.unitPrice - (i.profit || 0) / (i.quantity || 1)
-      })),
-      totalPrice: order.totalAmount,
-      paymentType: mapPaymentFromApi(order.paymentMethod),
-      cashierName: '', 
-      createdAt: order.createdAt,
-    }));
-  },
-  create: async (body: OrderRequest) => {
-    const payload = {
-      items: body.items.map(i => ({ productId: i.productId, quantity: i.quantity })),
-      paymentMethod: mapPaymentToApi(body.paymentType),
-      customerName: body.customerName,
-      customerPhone: body.customerPhone,
-      discountAmount: 0,
-      paidAmount: body.paymentType !== 'DEBT' ? undefined : 0
-    };
-    const data = await request<any>('POST', '/api/orders', payload);
-    return {
-      id: data.id,
-      items: (data.items || []).map((i: any) => ({ 
-        productId: 0, productName: i.productName, quantity: i.quantity, price: i.unitPrice, costPrice: 0 
-      })),
-      totalPrice: data.totalAmount,
-      paymentType: mapPaymentFromApi(data.paymentMethod),
-      cashierName: '',
-      createdAt: data.createdAt,
-      customerName: body.customerName,
-      customerPhone: body.customerPhone,
-    };
-  },
+  getAll: (page = 0, size = 20) =>
+    request<PagedResponse<OrderResponse>>('GET', '/api/orders', undefined, { page, size }),
+  getById: (id: number) => request<OrderResponse>('GET', `/api/orders/${id}`),
+  create: (body: OrderRequest) => request<OrderResponse>('POST', '/api/orders', body),
 };
 
 // ─── Debts ───────────────────────────────────────────────────────────────────
-export interface DebtResponse {
-  id: number; customerName: string; customerPhone: string;
-  amount: number; paidAmount: number; remainingAmount: number;
-  status: string; description?: string; createdAt: string;
-}
+export type DebtStatus = 'PAID' | 'PARTIAL' | 'UNPAID';
+
 export interface DebtRequest {
-  customerName: string; customerPhone: string; amount: number; description?: string;
+  customerName: string; phone?: string; amount: number; orderId?: number;
+}
+export interface DebtResponse {
+  id: number;
+  customerName: string;
+  phone?: string;
+  amount: number;
+  paidAmount: number;
+  createdAt: string;
+  status: DebtStatus;
+  orderId?: number;
 }
 export interface DebtPayRequest { amount: number }
-export interface DebtPaymentResponse { id: number; amount: number; createdAt: string }
+export interface DebtPaymentResponse {
+  id: number; amount: number; performedBy: string; createdAt: string;
+}
 
-function mapDebtFromApi(debt: any): DebtResponse {
-  return {
-    id: debt.id,
-    customerName: debt.customerName,
-    customerPhone: debt.phone || '',
-    amount: debt.amount,
-    paidAmount: debt.paidAmount,
-    remainingAmount: debt.amount - debt.paidAmount,
-    status: debt.status,
-    createdAt: debt.createdAt,
-  };
+/** Not sent by the server — derived from the two amounts it does send. */
+export function remainingAmount(debt: Pick<DebtResponse, 'amount' | 'paidAmount'>): number {
+  return Math.max(0, (debt.amount ?? 0) - (debt.paidAmount ?? 0));
 }
 
 export const debtsApi = USE_MOCK ? mockDebtsApi : {
-  getAll: async (page = 0, size = 20) => {
-    const res = await request<PagedResponse<any>>('GET', '/api/debts', undefined, { page, size });
-    return mapPage(res, mapDebtFromApi);
-  },
-  create: async (body: DebtRequest) => {
-    const payload = { customerName: body.customerName, phone: body.customerPhone, amount: body.amount };
-    const data = await request<any>('POST', '/api/debts', payload);
-    return mapDebtFromApi(data);
-  },
-  update: async (id: number, body: DebtRequest) => {
-    const payload = { customerName: body.customerName, phone: body.customerPhone, amount: body.amount };
-    const data = await request<any>('PUT', `/api/debts/${id}`, payload);
-    return mapDebtFromApi(data);
-  },
+  getAll: (page = 0, size = 20) =>
+    request<PagedResponse<DebtResponse>>('GET', '/api/debts', undefined, { page, size }),
+  create: (body: DebtRequest) => request<DebtResponse>('POST', '/api/debts', body),
+  update: (id: number, body: DebtRequest) => request<DebtResponse>('PUT', `/api/debts/${id}`, body),
   delete: (id: number) => request<void>('DELETE', `/api/debts/${id}`),
-  pay: async (id: number, body: DebtPayRequest) => {
-    const data = await request<any>('PUT', `/api/debts/${id}/pay`, body);
-    return mapDebtFromApi(data);
-  },
+  pay: (id: number, body: DebtPayRequest) => request<DebtResponse>('PUT', `/api/debts/${id}/pay`, body),
   getPayments: (id: number) => request<DebtPaymentResponse[]>('GET', `/api/debts/${id}/payments`),
 };
 
-// ─── Stock Movements ─────────────────────────────────────────────────────────
+// ─── Stock movements ─────────────────────────────────────────────────────────
+export type StockMovementType = 'IN' | 'OUT' | 'SALE' | 'ADJUSTMENT';
+
 export interface StockMovementResponse {
-  id: number; productName: string; type: string; quantity: number; note?: string; createdAt: string;
-}
-export interface OutflowResponse {
-  id: number; productName: string; quantity: number; reason: string; createdAt: string;
+  id: number;
+  type: StockMovementType;
+  productName: string;
+  quantity: number;
+  performedBy: string;
+  reason?: string;
+  createdAt: string;
 }
 
 export const stockMovementsApi = USE_MOCK ? mockStockMovementsApi : {
-  getAll: async (params?: {
-    from?: string; to?: string; type?: string; page?: number; size?: number;
-  }) => {
-    const res = await request<PagedResponse<any>>('GET', '/api/stock-movements', undefined, {
+  getAll: (params?: { from?: string; to?: string; type?: string; page?: number; size?: number }) =>
+    request<PagedResponse<StockMovementResponse>>('GET', '/api/stock-movements', undefined, {
       from: params?.from,
       to: params?.to,
       type: params?.type,
       page: params?.page ?? 0,
       size: params?.size ?? 20,
-    });
-    return mapPage(res, item => ({
-      id: item.id, productName: item.productName, type: item.type, quantity: item.quantity, note: item.reason, createdAt: item.createdAt
-    }));
-  }
+    }),
 };
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
+// The server reports revenue, profit and credit sales. It does NOT break revenue
+// down by cash vs card, and it does not report item counts or inventory value —
+// so no screen should claim to show those.
+export interface ProductSalesResponse {
+  productId: number; productName: string; quantitySold: number;
+}
 export interface SalesReportResponse {
-  totalOrders: number; totalRevenue: number; totalItems: number;
-  cashAmount: number; cardAmount: number; debtAmount: number;
-  totalCost: number; totalProfit: number;
+  from: string;
+  to: string;
+  totalOrders: number;
+  totalRevenue: number;
+  totalProfit: number;
+  /** Portion of revenue sold on credit (qarzga). */
+  creditSalesAmount: number;
+  topProducts: ProductSalesResponse[];
 }
 export interface DailySalesResponse {
-  date: string; totalOrders: number; totalRevenue: number; totalProfit: number;
+  date: string;
+  totalOrders: number;
+  totalRevenue: number;
+  totalProfit: number;
+  creditSalesAmount: number;
 }
-export interface UserSalesResponse { username: string; totalOrders: number; totalRevenue: number }
-export interface ProfitByProductResponse {
-  productId: number; productName: string; quantitySold: number;
-  revenue: number; cost: number; profit: number; marginPct: number;
-}
-export interface InventorySummaryResponse {
-  totalProducts: number; lowStockCount: number; inventoryValue: number; inventoryCost: number;
+export interface UserSalesResponse {
+  userId: number; fullName: string; role: Role;
+  totalOrders: number; totalRevenue: number; totalProfit: number;
 }
 
-function mapSalesReport(data: any): SalesReportResponse {
-  return {
-    totalOrders: data.totalOrders || 0,
-    totalRevenue: data.totalRevenue || 0,
-    totalProfit: data.totalProfit || 0,
-    totalItems: 0,
-    cashAmount: (data.totalRevenue || 0) - (data.creditSalesAmount || 0),
-    cardAmount: 0,
-    debtAmount: data.creditSalesAmount || 0,
-    totalCost: (data.totalRevenue || 0) - (data.totalProfit || 0),
-  };
+/** Cost of goods sold — not sent, but revenue minus profit is exactly that. */
+export function totalCost(r: Pick<SalesReportResponse, 'totalRevenue' | 'totalProfit'>): number {
+  return (r.totalRevenue ?? 0) - (r.totalProfit ?? 0);
+}
+
+/** Profit as a percentage of revenue. */
+export function marginPct(r: Pick<SalesReportResponse, 'totalRevenue' | 'totalProfit'>): number {
+  if (!r.totalRevenue) return 0;
+  return Math.round((r.totalProfit / r.totalRevenue) * 1000) / 10;
 }
 
 export const reportsApi = USE_MOCK ? mockReportsApi : {
-  daily: async (date?: string) => {
-    const data = await request<any>('GET', '/api/reports/daily', undefined, { date });
-    return mapSalesReport(data);
-  },
-  range: async (from: string, to: string) => {
-    const data = await request<any>('GET', '/api/reports', undefined, { from, to });
-    return mapSalesReport(data);
-  },
-  rangeDaily: async (from: string, to: string) => {
-    const data = await request<any[]>('GET', '/api/reports/range-daily', undefined, { from, to });
-    return data;
-  },
-  byUser: async (from: string, to: string) => {
-    const data = await request<any[]>('GET', '/api/reports/by-user', undefined, { from, to });
-    return data.map(u => ({ username: u.fullName, totalOrders: u.totalOrders, totalRevenue: u.totalRevenue }));
-  },
-  profitByProduct: async (from: string, to: string) => {
-    // Backend API does not have profitByProduct yet, return empty list to not break UI
-    return [] as ProfitByProductResponse[];
-  },
-  inventorySummary: async () => {
-    // Backend API does not have inventorySummary yet, return zeros
-    return { totalProducts: 0, lowStockCount: 0, inventoryValue: 0, inventoryCost: 0 };
-  },
+  daily: (date?: string) =>
+    request<SalesReportResponse>('GET', '/api/reports/daily', undefined, { date }),
+  range: (from: string, to: string) =>
+    request<SalesReportResponse>('GET', '/api/reports', undefined, { from, to }),
+  rangeDaily: (from: string, to: string) =>
+    request<DailySalesResponse[]>('GET', '/api/reports/range-daily', undefined, { from, to }),
+  byUser: (from: string, to: string) =>
+    request<UserSalesResponse[]>('GET', '/api/reports/by-user', undefined, { from, to }),
   exportCsv: (from: string, to: string) =>
     `${BASE_URL}/api/reports/export?from=${from}&to=${to}&format=csv`,
 };
 
-// ─── SMS ─────────────────────────────────────────────────────────────────────
-export interface SmsSendRequest { message: string; phones: string[]; campaignName?: string }
-export interface SmsCampaignResponse {
-  id: number; campaignName?: string; message: string; phones: string[];
-  delivered: boolean; createdAt: string;
+/**
+ * Inventory overview. The server has no summary endpoint, so this asks the two
+ * paged endpoints for their totals only (size=1) and reads `totalElements`.
+ * Inventory *value* is deliberately absent — it cannot be computed without
+ * pulling every product.
+ */
+export async function inventorySummary(): Promise<{ totalProducts: number; lowStockCount: number }> {
+  const [all, low] = await Promise.all([
+    productsApi.getAll(undefined, 0, 1),
+    productsApi.lowStock(LOW_STOCK_THRESHOLD, 0, 1),
+  ]);
+  return {
+    totalProducts: extractPage(all).totalElements,
+    lowStockCount: extractPage(low).totalElements,
+  };
 }
-export interface SmsBalanceResponse { balance: number; currency: string }
+
+// ─── SMS ─────────────────────────────────────────────────────────────────────
+export interface SmsSendRequest { recipients: string[]; message: string }
+export interface SmsCampaignResponse {
+  id: number;
+  message: string;
+  /** The server stores recipients as a single joined string. */
+  recipients: string;
+  createdAt: string;
+  smsCount: number;
+  delivered: boolean;
+}
+export interface SmsBalanceResponse { balance: number; mock: boolean }
+
+/** Splits the server's joined recipient string back into individual numbers. */
+export function parseRecipients(recipients: string | undefined): string[] {
+  if (!recipients) return [];
+  return recipients.split(/[\n,;]+/).map(p => p.trim()).filter(Boolean);
+}
 
 export const smsApi = USE_MOCK ? mockSmsApi : {
-  getCampaigns: async () => {
-    const data = await request<any[]>('GET', '/api/sms/campaigns');
-    return data.map(c => ({
-      id: c.id, message: c.message, phones: [c.recipients || ''], delivered: c.delivered, createdAt: c.createdAt
-    }));
-  },
-  sendSms: async (body: SmsSendRequest) => {
-    const payload = { message: body.message, recipients: body.phones };
-    const data = await request<any>('POST', '/api/sms/send', payload);
-    return {
-      id: data.id, message: data.message, phones: [data.recipients || ''], delivered: data.delivered, createdAt: data.createdAt
-    };
-  },
-  getBalance: async () => {
-    const data = await request<any>('GET', '/api/sms/balance');
-    return { balance: data.balance, currency: 'so\'m' };
-  },
+  getCampaigns: (page = 0, size = 20) =>
+    request<PagedResponse<SmsCampaignResponse>>('GET', '/api/sms/campaigns', undefined, { page, size }),
+  /** Returns 501 while the Eskiz integration is not wired up. */
+  sendSms: (body: SmsSendRequest) => request<SmsCampaignResponse>('POST', '/api/sms/send', body),
+  getBalance: () => request<SmsBalanceResponse>('GET', '/api/sms/balance'),
 };
 
 // ─── Settings ────────────────────────────────────────────────────────────────
-export interface SettingsResponse {
-  storeName: string; currency: string; taxRate: number;
-  address?: string; phone?: string; monthlyTarget?: number; [key: string]: unknown;
-}
-export type SettingsRequest = SettingsResponse;
+// The server stores only these two. Store name, currency, tax rate and monthly
+// target do not exist in the API — screens must not pretend to save them.
+export interface SettingsRequest { language: string; darkMode: boolean }
+export interface SettingsResponse { id: number; language: string; darkMode: boolean }
 
 export const settingsApi = USE_MOCK ? mockSettingsApi : {
-  get: async () => {
-    const data = await request<any>('GET', '/api/settings').catch(() => ({}));
-    return {
-      storeName: 'Do\'kon', currency: 'UZS', taxRate: 0,
-      ...data
-    };
-  },
-  update: async (body: SettingsRequest) => {
-    const payload = { language: body.language || 'uz', darkMode: !!body.darkMode };
-    const data = await request<any>('PUT', '/api/settings', payload);
-    return {
-      storeName: 'Do\'kon', currency: 'UZS', taxRate: 0,
-      ...data
-    };
-  },
+  get: () => request<SettingsResponse>('GET', '/api/settings'),
+  update: (body: SettingsRequest) => request<SettingsResponse>('PUT', '/api/settings', body),
 };
-
-// ─── Pagination ──────────────────────────────────────────────────────────────
-export interface PagedResponse<T> {
-  content?: T[];
-  _embedded?: { [key: string]: T[] };
-  page?: { size: number; totalElements: number; totalPages: number; number: number };
-  totalElements?: number;
-  totalPages?: number;
-  number?: number;
-  size?: number;
-}
-
-export function extractContent<T>(data: PagedResponse<T>): T[] {
-  if (data.content) return data.content;
-  if (data._embedded) {
-    const values = Object.values(data._embedded);
-    if (values.length > 0) return values[0] as T[];
-  }
-  return [];
-}
-
-export function extractPage(data: PagedResponse<unknown>) {
-  return {
-    totalElements: data.page?.totalElements ?? data.totalElements ?? 0,
-    totalPages: data.page?.totalPages ?? data.totalPages ?? 1,
-    number: data.page?.number ?? data.number ?? 0,
-    size: data.page?.size ?? data.size ?? 20,
-  };
-}

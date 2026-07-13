@@ -1,52 +1,70 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { AlertCircle, Delete, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/common/Logo';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
 const isDemoMode = import.meta.env.VITE_USE_MOCK === 'true';
+// The PIN submits itself once this many digits are entered — there is no
+// confirm button. Bump this if PINs ever get longer than four digits.
+const PIN_LENGTH = 4;
 
 export default function LoginPage() {
-  const [pin, setPin] = useState(isDemoMode ? '0000' : '');
+  const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!pin.trim()) {
-      setError("PIN kod kiritilmadi");
-      return;
-    }
+  const submit = useCallback(async (value: string) => {
     setError('');
     setLoading(true);
     try {
-      const res = await authApi.login({ pin });
+      const res = await authApi.login({ pin: value });
       login(res);
-      toast.success(`Xush kelibsiz, ${res.username}!`);
+      toast.success(`Xush kelibsiz, ${res.fullName}!`);
       navigate('/');
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')) {
-        setError('Server bilan bog\'lanib bo\'lmadi. Internet aloqasini tekshiring yoki PIN kodingizni tekshiring.');
+        setError("Server bilan bog'lanib bo'lmadi. Internet aloqasini tekshiring.");
       } else {
-        setError(msg || 'PIN noto\'g\'ri');
+        setError(msg || "PIN noto'g'ri");
       }
+      setPin('');
     } finally {
       setLoading(false);
     }
+  }, [login, navigate]);
+
+  // Fire once the last digit lands. The ref guards against a second submit for
+  // the same PIN if this effect re-runs before `loading` has flipped.
+  const submittingRef = useRef(false);
+  useEffect(() => {
+    if (pin.length < PIN_LENGTH || submittingRef.current) return;
+    submittingRef.current = true;
+    submit(pin).finally(() => { submittingRef.current = false; });
+  }, [pin, submit]);
+
+  function press(digit: string) {
+    if (loading) return;
+    setError('');
+    setPin(prev => (prev.length >= PIN_LENGTH ? prev : prev + digit));
+  }
+
+  function backspace() {
+    if (loading) return;
+    setError('');
+    setPin(prev => prev.slice(0, -1));
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel */}
+    <div className="min-h-[100dvh] flex bg-background">
+      {/* Brand panel — desktop only */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col items-center justify-center p-12">
         <div className="max-w-sm w-full text-center">
           <img src="/logo-dark.png" alt="inPOS" className="h-12 w-auto object-contain mx-auto mb-6" />
@@ -63,62 +81,103 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-background">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="flex lg:hidden items-center justify-center mb-8">
-            <Logo className="h-8" />
-          </div>
-
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground">Tizimga kirish</h2>
-            {isDemoMode && <p className="text-muted-foreground text-sm mt-1">Demo rejim — API ulanmaydi</p>}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="pin">PIN kod</Label>
-              <div className="relative">
-                <Input
-                  id="pin"
-                  type={showPin ? 'text' : 'password'}
-                  placeholder={isDemoMode ? '0000 / 1111 / 2222' : 'PIN kodni kiriting'}
-                  value={pin}
-                  onChange={e => setPin(e.target.value)}
-                  className="pr-10"
-                  autoComplete="current-password"
-                  maxLength={20}
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPin(v => !v)}
-                  tabIndex={-1}
-                >
-                  {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+      {/* PIN panel */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 safe-area-top safe-area-bottom">
+        <div className="w-full max-w-[340px] flex flex-col items-center gap-7">
+          <div className="flex flex-col items-center gap-5">
+            <Logo className="h-9" />
+            <div className="text-center">
+              <h2 className="text-xl font-bold text-foreground tracking-tight">PIN kodni kiriting</h2>
               {isDemoMode && (
-                <p className="text-xs text-muted-foreground">
-                  Demo PIN: <span className="font-mono font-semibold">0000</span> (SUPER_ADMIN) ·{' '}
-                  <span className="font-mono font-semibold">1111</span> (ADMIN) ·{' '}
-                  <span className="font-mono font-semibold">2222</span> (KASSIR)
-                </p>
+                <p className="text-muted-foreground text-xs mt-1">Demo: 0000 · 1111 · 2222</p>
+              )}
+            </div>
+          </div>
+
+          {/* PIN dots */}
+          <div className="flex flex-col items-center gap-3 w-full">
+            <div className="flex items-center justify-center gap-3 h-9">
+              {showPin ? (
+                <span className="text-3xl font-bold tracking-[0.3em] tabular-nums text-foreground">
+                  {pin || '—'}
+                </span>
+              ) : (
+                Array.from({ length: PIN_LENGTH }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      'h-3.5 w-3.5 rounded-full transition-colors duration-150',
+                      i < pin.length ? 'bg-primary' : 'bg-muted border border-border'
+                    )}
+                  />
+                ))
               )}
             </div>
 
-            {error && (
-              <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 px-3 py-2 rounded-md">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowPin(v => !v)}
+              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground h-9 px-3 rounded-full press"
+            >
+              {showPin ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {showPin ? 'Yashirish' : "Ko'rsatish"}
+            </button>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Kirilmoqda...' : 'Kirish'}
-            </Button>
-          </form>
+            {/* Fixed-height slot so the keypad doesn't shift when a message appears. */}
+            <div className="min-h-10 w-full flex items-start justify-center">
+              {loading ? (
+                <div className="flex items-center gap-2 text-muted-foreground text-[13px] px-3 py-2">
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  <span>Tekshirilmoqda...</span>
+                </div>
+              ) : error ? (
+                <div className="flex items-center gap-2 text-destructive text-[13px] bg-destructive/10 px-3 py-2 rounded-xl text-center">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Keypad */}
+          <div className="grid grid-cols-3 gap-3 w-full">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => press(d)}
+                disabled={loading}
+                className="h-16 rounded-2xl bg-muted/50 text-2xl font-semibold text-foreground active:bg-muted disabled:opacity-40 press"
+              >
+                {d}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPin('')}
+              disabled={loading || pin.length === 0}
+              className="h-16 rounded-2xl text-sm font-semibold text-muted-foreground disabled:opacity-30 press"
+            >
+              Tozalash
+            </button>
+            <button
+              type="button"
+              onClick={() => press('0')}
+              disabled={loading}
+              className="h-16 rounded-2xl bg-muted/50 text-2xl font-semibold text-foreground active:bg-muted disabled:opacity-40 press"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={backspace}
+              disabled={loading || pin.length === 0}
+              aria-label="O'chirish"
+              className="h-16 rounded-2xl flex items-center justify-center text-muted-foreground disabled:opacity-30 press"
+            >
+              <Delete className="h-6 w-6" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

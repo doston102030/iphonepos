@@ -8,7 +8,7 @@ NetDC Orders - Boshqaruv paneli
 ### 1.2 Ilova tavsifi
 NetDC Orders - bu savdo nuqtalari uchun to'liq boshqaruv paneli veb-ilovasi bo'lib, mahsulotlar, buyurtmalar, qarzlar, ombor harakatlari va hisobotlarni boshqarish imkonini beradi. Ilova PIN kod orqali autentifikatsiya va rol asosidagi kirish nazoratini qo'llab-quvvatlaydi.
 
-**API Base URL:** https://orders.netdc.uz
+**API Base URL:** https://api.netdc.uz
 
 **Autentifikatsiya:** JWT Bearer token (PIN kod orqali)
 

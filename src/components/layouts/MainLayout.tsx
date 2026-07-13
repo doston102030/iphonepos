@@ -2,24 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ShoppingCart, CreditCard, Warehouse,
-  BarChart3, MessageSquare, Settings, Users, LogOut, Menu,
+  BarChart3, MessageSquare, Settings, Users, LogOut,
   ChevronRight, Sun, Moon, MoreHorizontal, TrendingUp, Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/common/Logo';
+import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { cn, getRoleLabel } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useCart } from '@/contexts/CartContext';
-import { debtsApi, extractContent } from '@/lib/api';
+import { debtsApi, extractContent, type Role } from '@/lib/api';
 
 interface NavItem {
   label: string;
   path: string;
   icon: React.ReactNode;
-  roles?: string[];
+  roles?: Role[];
 }
 
 const navItems: NavItem[] = [
@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
   { label: 'Qarzlar', path: '/debts', icon: <CreditCard className="h-4 w-4" /> },
   { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
   { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
-  { label: 'Foyda / Zarar', path: '/profit', icon: <TrendingUp className="h-4 w-4" />, roles: ['ADMIN', 'SUPER_ADMIN'] },
+  { label: 'Foyda / Zarar', path: '/profit', icon: <TrendingUp className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
   { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" /> },
   { label: 'Foydalanuvchilar', path: '/users', icon: <Users className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
   { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
@@ -43,17 +43,17 @@ const bottomTabs = [
   { label: 'Qarzlar', path: '/debts', icon: CreditCard },
 ];
 
-const kassirMoreItems: NavItem[] = [
+const cashierMoreItems: NavItem[] = [
   { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" /> },
   { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
   { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
 ];
 
-const adminMoreItems: NavItem[] = [
+const superAdminMoreItems: NavItem[] = [
   { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" /> },
   { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
   { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
-  { label: 'Foyda / Zarar', path: '/profit', icon: <TrendingUp className="h-4 w-4" />, roles: ['ADMIN', 'SUPER_ADMIN'] },
+  { label: 'Foyda / Zarar', path: '/profit', icon: <TrendingUp className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
   { label: 'Foydalanuvchilar', path: '/users', icon: <Users className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
 ];
 
@@ -77,7 +77,9 @@ function ThemeToggle({ className }: { className?: string }) {
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const { user } = useAuth();
-  const visibleItems = navItems.filter(item => !item.roles || item.roles.includes(user?.role ?? ''));
+  const visibleItems = navItems.filter(
+    item => !item.roles || (!!user && item.roles.includes(user.role))
+  );
 
   return (
     <nav className="flex-1 px-3 py-2 space-y-0.5">
@@ -128,11 +130,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="px-4 py-3 border-t border-sidebar-border mt-auto">
         <div className="flex items-center gap-2 mb-2">
           <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-primary">{user?.username?.[0]?.toUpperCase() ?? 'U'}</span>
+            <span className="text-xs font-bold text-primary">{user?.fullName?.[0]?.toUpperCase() ?? 'U'}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-sidebar-foreground truncate">{user?.username}</p>
-            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">{getRoleLabel(user?.role ?? '')}</Badge>
+            <p className="text-xs font-semibold text-sidebar-foreground truncate">{user?.fullName}</p>
+            {user && (
+              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">{getRoleLabel(user.role)}</Badge>
+            )}
           </div>
         </div>
         <Button
@@ -159,9 +163,11 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
     return 0;
   };
 
+  const tabClass = 'flex-1 flex flex-col items-center justify-center gap-0.5 h-[4.25rem] text-[10px] font-semibold press';
+
   return (
-    <nav className="absolute bottom-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-xl border-t border-border shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.1)] safe-area-bottom">
-      <div className="flex items-stretch h-[4.5rem]">
+    <nav className="absolute bottom-0 left-0 right-0 z-40 bg-background/85 backdrop-blur-xl border-t border-border safe-area-bottom">
+      <div className="flex items-stretch">
         {bottomTabs.map(tab => {
           const Icon = tab.icon;
           const isActive = tab.path === '/'
@@ -172,33 +178,31 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
             <Link
               key={tab.path}
               to={tab.path}
-              className={cn(
-                'flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-bold transition-all',
-                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              )}
+              className={cn(tabClass, isActive ? 'text-primary' : 'text-muted-foreground')}
             >
-              <div className={cn(
-                'relative flex items-center justify-center h-10 w-10 rounded-2xl transition-all duration-300',
-                isActive ? 'bg-primary/10 scale-110 shadow-sm' : ''
+              <span className={cn(
+                'relative flex items-center justify-center h-9 w-12 rounded-xl transition-colors duration-200',
+                isActive && 'bg-primary/10'
               )}>
-                <Icon className={cn('h-6 w-6 transition-transform', isActive ? 'text-primary scale-110' : 'text-muted-foreground')} />
+                <Icon className="h-[22px] w-[22px]" />
                 {badge > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 h-5 min-w-5 px-1.5 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center shadow-md border-2 border-background">
+                  <span className="absolute -top-1 right-1 h-[18px] min-w-[18px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center border-2 border-background">
                     {badge > 99 ? '99+' : badge}
                   </span>
                 )}
-              </div>
-              <span className={cn('transition-all duration-300', isActive ? 'translate-y-0.5' : '')}>{tab.label}</span>
+              </span>
+              <span className="truncate max-w-full px-1">{tab.label}</span>
             </Link>
           );
         })}
         <button
+          type="button"
           onClick={onMoreOpen}
-          className="flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-all"
+          className={cn(tabClass, 'text-muted-foreground')}
         >
-          <div className="flex items-center justify-center h-10 w-10 rounded-2xl transition-all duration-300">
-            <MoreHorizontal className="h-6 w-6" />
-          </div>
+          <span className="flex items-center justify-center h-9 w-12 rounded-xl">
+            <MoreHorizontal className="h-[22px] w-[22px]" />
+          </span>
           <span>Ko'proq</span>
         </button>
       </div>
@@ -206,17 +210,17 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
   );
 }
 
-import { MobileOverlay } from '@/components/common/MobileOverlay';
-
 function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const isKassir = user?.role === 'KASSIR';
-  const moreItems = isKassir
-    ? kassirMoreItems
-    : adminMoreItems.filter(item => !item.roles || item.roles.includes(user?.role ?? ''));
+  const isCashier = user?.role === 'CASHIER';
+  const moreItems = isCashier
+    ? cashierMoreItems
+    : superAdminMoreItems.filter(
+        item => !item.roles || (!!user && item.roles.includes(user.role))
+      );
 
   function handleLogout() { logout(); onClose(); navigate('/login'); }
   function handleNav(path: string) { navigate(path); onClose(); }
@@ -229,16 +233,20 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
         <div className="bg-background rounded-3xl p-4 flex items-center justify-between shadow-sm border border-border/50">
           <div className="flex items-center gap-3">
             <div className="h-14 w-14 rounded-full bg-gradient-primary flex items-center justify-center shadow-md shrink-0">
-              <span className="text-2xl font-bold text-white">{user?.username?.[0]?.toUpperCase() ?? 'U'}</span>
+              <span className="text-2xl font-bold text-white">{user?.fullName?.[0]?.toUpperCase() ?? 'U'}</span>
             </div>
             <div>
-              <p className="text-lg font-bold text-foreground leading-tight">{user?.username}</p>
-              <p className="text-sm font-medium text-muted-foreground">{getRoleLabel(user?.role ?? '')}</p>
+              <p className="text-lg font-bold text-foreground leading-tight">{user?.fullName}</p>
+              {user && (
+                <p className="text-sm font-medium text-muted-foreground">{getRoleLabel(user.role)}</p>
+              )}
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Chiqish"
             onClick={handleLogout}
-            className="h-12 w-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors"
+            className="h-12 w-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors press"
           >
             <LogOut className="h-5 w-5" />
           </button>
@@ -253,9 +261,10 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
             return (
               <button
                 key={item.path}
+                type="button"
                 onClick={() => handleNav(item.path)}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50',
+                  'flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 press',
                   isActive ? 'bg-primary/10 text-primary border-primary/20 shadow-sm' : 'bg-background text-foreground hover:bg-muted/50 shadow-sm'
                 )}
               >
@@ -271,8 +280,9 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           })}
           
           <button
+            type="button"
             onClick={toggleTheme}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 bg-background text-foreground hover:bg-muted/50 shadow-sm"
+            className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 bg-background text-foreground hover:bg-muted/50 shadow-sm press"
           >
             <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground">
               {theme === 'dark' ? <Sun className="h-6 w-6 text-amber-400" /> : <Moon className="h-6 w-6" />}
@@ -312,18 +322,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {user && (
-              <button 
-                onClick={() => setMoreOpen(true)} 
-                className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center transition-colors hover:bg-primary/20"
+              <button
+                type="button"
+                aria-label="Profil"
+                onClick={() => setMoreOpen(true)}
+                className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center transition-colors hover:bg-primary/20 press"
               >
-                <span className="text-[11px] font-bold text-primary">
-                  {user.username?.[0]?.toUpperCase()}
+                <span className="text-xs font-bold text-primary">
+                  {user.fullName?.[0]?.toUpperCase()}
                 </span>
               </button>
             )}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
+        <main className="flex-1 overflow-y-auto overscroll-contain pb-nav md:pb-0">
           <div className="mx-auto max-w-7xl w-full">
             {children}
           </div>
@@ -345,10 +357,12 @@ export function PageHeader({
   title, description, action,
 }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-6">
+    <div className="flex items-start justify-between gap-3 mb-4 md:mb-6">
       <div className="flex-1 min-w-0">
-        <h1 className="text-xl font-bold text-foreground md:text-2xl">{title}</h1>
-        {description && <p className="text-sm text-muted-foreground mt-0.5">{description}</p>}
+        <h1 className="text-[22px] leading-tight font-bold text-foreground tracking-tight md:text-2xl">{title}</h1>
+        {description && (
+          <p className="text-[13px] text-muted-foreground mt-1 md:text-sm">{description}</p>
+        )}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>

@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ShoppingCart, Package, CreditCard, TrendingUp,
-  Target, Warehouse, Wallet, TrendingDown,
+  Warehouse, Wallet, TrendingDown, Percent, Trophy,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import {
-  reportsApi, settingsApi, ordersApi,
-  type SalesReportResponse, type InventorySummaryResponse, type OrderResponse,
+  reportsApi, ordersApi, inventorySummary, marginPct,
+  type SalesReportResponse, type OrderResponse, type PaymentMethod,
   extractContent,
 } from '@/lib/api';
-import { cn, formatCurrency, formatDateTime, getPaymentTypeLabel } from '@/lib/utils';
+import { cn, formatCurrency, formatDateTime, getPaymentMethodLabel } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+
+/** What inventorySummary() can actually derive — no inventory value exists. */
+interface InventoryStats { totalProducts: number; lowStockCount: number }
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -30,15 +34,15 @@ function monthStartStr(): string {
 
 function KpiCard({
   title, value, sub, icon, tone = 'default',
-}: { title: string; value: string; sub?: string; icon: React.ReactNode; tone?: 'default' | 'accent' | 'success' | 'destructive' }) {
+}: { title: string; value: string; sub?: string; icon: React.ReactNode; tone?: 'default' | 'brand' | 'success' | 'destructive' }) {
   return (
-    <Card className="shadow-card">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <p className="text-sm text-muted-foreground font-medium">{title}</p>
+    <Card className="shadow-card rounded-2xl">
+      <CardContent className="p-4 md:p-5">
+        <div className="flex items-start justify-between gap-2 mb-2.5">
+          <p className="text-[13px] text-muted-foreground font-medium leading-tight">{title}</p>
           <div className={cn(
-            'h-8 w-8 rounded-md flex items-center justify-center shrink-0',
-            tone === 'accent' ? 'bg-accent/10 text-accent' :
+            'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
+            tone === 'brand' ? 'bg-brand/10 text-brand' :
             tone === 'success' ? 'bg-success/10 text-success' :
             tone === 'destructive' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary',
           )}>
@@ -61,46 +65,53 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+// The server sends four payment methods — this map is total, no fallback needed.
+function paymentBadgeVariant(method: PaymentMethod): 'default' | 'secondary' | 'destructive' | 'outline' {
+  const variants: Record<PaymentMethod, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+    CASH: 'default',
+    CARD: 'secondary',
+    MIXED: 'outline',
+    CREDIT: 'destructive',
+  };
+  return variants[method];
+}
+
 export default function DashboardPage() {
   const [today, setToday] = useState<SalesReportResponse | null>(null);
   const [week, setWeek] = useState<SalesReportResponse | null>(null);
   const [month, setMonth] = useState<SalesReportResponse | null>(null);
-  const [inventory, setInventory] = useState<InventorySummaryResponse | null>(null);
-  const [monthlyTarget, setMonthlyTarget] = useState(0);
+  const [inventory, setInventory] = useState<InventoryStats | null>(null);
   const [recentOrders, setRecentOrders] = useState<OrderResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, isAdmin } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
 
   useEffect(() => {
     Promise.all([
       reportsApi.daily(),
       reportsApi.range(daysAgoStr(6), todayStr()),
       reportsApi.range(monthStartStr(), todayStr()),
-      reportsApi.inventorySummary(),
-      settingsApi.get(),
+      inventorySummary(),
       ordersApi.getAll(0, 5),
-    ]).then(([d, w, m, inv, settings, ordersRes]) => {
+    ]).then(([d, w, m, inv, ordersRes]) => {
       setToday(d); setWeek(w); setMonth(m); setInventory(inv);
-      setMonthlyTarget(settings.monthlyTarget ?? 0);
       setRecentOrders(extractContent(ordersRes));
     }).catch(() => null).finally(() => setLoading(false));
   }, []);
 
-  const targetPct = monthlyTarget > 0
-    ? Math.min(100, Math.round(((month?.totalRevenue ?? 0) / monthlyTarget) * 100))
-    : 0;
+  // Revenue is not split by cash vs card, but the credit portion IS reported —
+  // so the only honest split is "paid up front" vs "sold on credit".
+  const todayRevenue = today?.totalRevenue ?? 0;
+  const todayCredit = today?.creditSalesAmount ?? 0;
+  const todayPaid = Math.max(0, todayRevenue - todayCredit);
+  const splitBase = todayRevenue || 1;
 
-  const paymentBadgeVariant = (type: string): 'default' | 'secondary' | 'destructive' => {
-    if (type === 'CASH') return 'default';
-    if (type === 'CARD') return 'secondary';
-    return 'destructive';
-  };
+  const topProducts = today?.topProducts ?? [];
 
   return (
     <MainLayout>
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader
-          title={`Xush kelibsiz, ${user?.username ?? ''}!`}
+          title={`Xush kelibsiz, ${user?.fullName ?? ''}!`}
           description="Bugungi savdo ko'rsatkichlari"
         />
 
@@ -119,9 +130,9 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
             <KpiCard
               title="Bugungi savdo"
-              value={formatCurrency(today?.totalRevenue ?? 0)}
+              value={formatCurrency(todayRevenue)}
               icon={<Wallet className="h-4 w-4" />}
-              tone="accent"
+              tone="brand"
             />
             <KpiCard
               title="Bugungi foyda"
@@ -135,9 +146,10 @@ export default function DashboardPage() {
               icon={<ShoppingCart className="h-4 w-4" />}
             />
             <KpiCard
-              title="Sotilgan mahsulot"
-              value={String(today?.totalItems ?? 0)}
-              icon={<Package className="h-4 w-4" />}
+              title="Marja"
+              value={`${today ? marginPct(today) : 0}%`}
+              icon={<Percent className="h-4 w-4" />}
+              tone={today && marginPct(today) >= 0 ? 'success' : 'destructive'}
             />
           </div>
         )}
@@ -145,33 +157,34 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card className="shadow-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                <Target className="h-4 w-4 text-primary" /> Oylik maqsad
-              </CardTitle>
+              <CardTitle className="text-sm font-semibold">Bugungi savdo taqsimoti</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               {loading ? (
-                <Skeleton className="h-16 w-full" />
-              ) : monthlyTarget > 0 ? (
-                <>
-                  <div className="flex items-end justify-between mb-2 gap-2">
-                    <span className="text-2xl font-bold text-foreground truncate">{formatCurrency(month?.totalRevenue ?? 0)}</span>
-                    <span className="text-sm text-muted-foreground shrink-0">/ {formatCurrency(monthlyTarget)}</span>
-                  </div>
-                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full transition-all', targetPct >= 100 ? 'bg-success' : 'bg-primary')}
-                      style={{ width: `${targetPct}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    {targetPct}% bajarildi · Bu oy sof foyda: {formatCurrency(month?.totalProfit ?? 0)}
-                  </p>
-                </>
+                <Skeleton className="h-20 w-full" />
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Oylik maqsad belgilanmagan. <a href="/settings" className="text-primary font-medium">Sozlamalarga o'tish</a>
-                </p>
+                [
+                  { label: "To'langan", value: todayPaid, color: 'bg-success' },
+                  { label: 'Qarzga sotuv', value: todayCredit, color: 'bg-destructive' },
+                ].map(item => {
+                  const pct = Math.round((item.value / splitBase) * 100);
+                  return (
+                    <div key={item.label}>
+                      <div className="flex justify-between gap-2 text-xs mb-1">
+                        <span className="text-muted-foreground shrink-0">{item.label}</span>
+                        <span className="font-medium truncate">
+                          {formatCurrency(item.value)} · {pct}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${item.color}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </CardContent>
           </Card>
@@ -187,7 +200,7 @@ export default function DashboardPage() {
                 <>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Mahsulotlar</span>
-                    <span className="font-semibold">{inventory?.totalProducts ?? 0}</span>
+                    <span className="font-semibold">{inventory?.totalProducts ?? 0} dona</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Kam qolgan</span>
@@ -195,10 +208,9 @@ export default function DashboardPage() {
                       {inventory?.lowStockCount ?? 0}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Ombor qiymati</span>
-                    <span className="font-semibold">{formatCurrency(inventory?.inventoryValue ?? 0)}</span>
-                  </div>
+                  <Link to="/products" className="inline-flex items-center min-h-11 text-xs text-primary font-medium press">
+                    Mahsulotlarni ko'rish →
+                  </Link>
                 </>
               )}
             </CardContent>
@@ -235,36 +247,27 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card className="shadow-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Bugungi to'lov turlari</CardTitle>
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                <Trophy className="h-4 w-4 text-primary" /> Eng ko'p sotilgan
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {loading ? (
                 <Skeleton className="h-20 w-full" />
+              ) : topProducts.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">Bugun sotuv bo'lmagan</p>
               ) : (
-                <>
-                  {[
-                    { label: 'Naqd', value: today?.cashAmount ?? 0, color: 'bg-primary' },
-                    { label: 'Karta', value: today?.cardAmount ?? 0, color: 'bg-accent' },
-                    { label: 'Qarz', value: today?.debtAmount ?? 0, color: 'bg-destructive' },
-                  ].map(item => {
-                    const total = (today?.totalRevenue ?? 0) || 1;
-                    const pct = Math.round((item.value / total) * 100);
-                    return (
-                      <div key={item.label}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-muted-foreground">{item.label}</span>
-                          <span className="font-medium">{pct}%</span>
-                        </div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${item.color}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
+                topProducts.map((p, i) => (
+                  <div key={p.productId} className="flex items-center justify-between gap-2 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="h-5 w-5 rounded-md bg-muted text-[11px] font-bold flex items-center justify-center shrink-0">
+                        {i + 1}
+                      </span>
+                      <span className="truncate">{p.productName}</span>
+                    </div>
+                    <span className="font-semibold shrink-0">{p.quantitySold} dona</span>
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>
@@ -279,16 +282,16 @@ export default function DashboardPage() {
                   { label: 'Yangi savdo', path: '/sell', icon: <ShoppingCart className="h-4 w-4" /> },
                   { label: 'Mahsulotlar', path: '/products', icon: <Package className="h-4 w-4" /> },
                   { label: 'Qarzlar', path: '/debts', icon: <CreditCard className="h-4 w-4" /> },
-                  ...(isAdmin ? [{ label: 'Foyda / Zarar', path: '/profit', icon: <TrendingDown className="h-4 w-4" /> }] : []),
+                  ...(isSuperAdmin ? [{ label: 'Foyda / Zarar', path: '/profit', icon: <TrendingDown className="h-4 w-4" /> }] : []),
                 ].map(item => (
-                  <a
+                  <Link
                     key={item.path}
-                    href={item.path}
-                    className="flex items-center gap-2 p-3 rounded-md border border-border hover:bg-muted transition-colors text-sm font-medium"
+                    to={item.path}
+                    className="flex items-center gap-2 p-3 min-h-11 rounded-xl border border-border hover:bg-muted transition-colors text-sm font-medium press"
                   >
-                    <span className="text-primary">{item.icon}</span>
-                    {item.label}
-                  </a>
+                    <span className="text-primary shrink-0">{item.icon}</span>
+                    <span className="truncate">{item.label}</span>
+                  </Link>
                 ))}
               </div>
             </CardContent>
@@ -298,7 +301,7 @@ export default function DashboardPage() {
         <Card className="shadow-card">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold">So'nggi buyurtmalar</CardTitle>
-            <a href="/orders" className="text-xs text-primary font-medium">Barchasi →</a>
+            <Link to="/orders" className="text-xs text-primary font-medium shrink-0">Barchasi →</Link>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
@@ -312,13 +315,13 @@ export default function DashboardPage() {
                 {recentOrders.map(o => (
                   <div key={o.id} className="flex items-center justify-between gap-2 px-4 py-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">#{o.id} · {o.cashierName}</p>
+                      <p className="text-sm font-medium truncate">#{o.id}</p>
                       <p className="text-xs text-muted-foreground">{formatDateTime(o.createdAt)}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold">{formatCurrency(o.totalPrice)}</p>
-                      <Badge variant={paymentBadgeVariant(o.paymentType)} className="mt-0.5">
-                        {getPaymentTypeLabel(o.paymentType)}
+                      <p className="text-sm font-bold">{formatCurrency(o.totalAmount)}</p>
+                      <Badge variant={paymentBadgeVariant(o.paymentMethod)} className="mt-0.5">
+                        {getPaymentMethodLabel(o.paymentMethod)}
                       </Badge>
                     </div>
                   </div>

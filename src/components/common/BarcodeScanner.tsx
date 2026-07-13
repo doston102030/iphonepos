@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Camera } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MobileOverlay } from '@/components/common/MobileOverlay';
+import { cn } from '@/lib/utils';
 
 const SCANNER_ELEMENT_ID = 'barcode-scanner-viewport';
 
@@ -28,6 +29,14 @@ export function BarcodeScannerDialog({
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Callers pass inline arrows for these, so their identity changes on every
+  // parent render. Keeping them in refs lets the camera effect depend only on
+  // `open` — otherwise the camera tears down and restarts on each render.
+  const onDetectedRef = useRef(onDetected);
+  const onOpenChangeRef = useRef(onOpenChange);
+  onDetectedRef.current = onDetected;
+  onOpenChangeRef.current = onOpenChange;
+
   useEffect(() => {
     if (!open) return;
     let isMounted = true;
@@ -37,12 +46,12 @@ export function BarcodeScannerDialog({
 
     const onSuccess = (decodedText: string) => {
       if (!isMounted) return;
-      onDetected(decodedText);
-      onOpenChange(false);
+      onDetectedRef.current(decodedText);
+      onOpenChangeRef.current(false);
     };
     const scanConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-    // Wait a bit for Dialog animation and DOM to settle
+    // Wait a bit for the overlay animation and DOM to settle.
     const timer = setTimeout(async () => {
       if (!isMounted || !containerRef.current) return;
 
@@ -73,8 +82,7 @@ export function BarcodeScannerDialog({
           }
         }
         if (isMounted) started = true;
-      } catch (err) {
-        console.error('Scanner error:', err);
+      } catch {
         if (isMounted) setError("Kameraga ruxsat berilmadi yoki qurilma topilmadi. Shtrix-kodni qo'lda kiriting.");
       }
     }, 150);
@@ -84,45 +92,47 @@ export function BarcodeScannerDialog({
       clearTimeout(timer);
       if (scanner && started) {
         scanner.stop().then(() => scanner?.clear()).catch(() => {
-          try { scanner?.clear(); } catch {}
+          try { scanner?.clear(); } catch { /* already torn down */ }
         });
       }
     };
-  }, [open, onDetected, onOpenChange]);
+  }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md p-4">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <div className="rounded-2xl overflow-hidden bg-black aspect-square flex items-center justify-center relative">
-          <div id={SCANNER_ELEMENT_ID} ref={containerRef} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
-          <div className="absolute inset-0 border-2 border-primary m-10 rounded-xl pointer-events-none" />
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title={title}>
+      <div className="flex flex-col h-full bg-black">
+        <div className="flex-1 relative overflow-hidden">
+          <div id={SCANNER_ELEMENT_ID} ref={containerRef} className="absolute inset-0 [&_video]:h-full [&_video]:w-full [&_video]:object-cover" />
+          {!error && (
+            <>
+              <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[72vw] max-w-[280px] aspect-square rounded-3xl ring-2 ring-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none" />
+            </>
+          )}
         </div>
-        {error ? (
-          <p className="text-sm text-destructive text-center font-medium">{error}</p>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center font-medium">Kamerani shtrix-kodga qarating</p>
-        )}
-      </DialogContent>
-    </Dialog>
+        <div className="shrink-0 px-6 py-6 pb-8 bg-black text-center safe-area-bottom">
+          {error ? (
+            <p className="text-sm text-red-400 font-medium">{error}</p>
+          ) : (
+            <p className="text-sm text-white/70 font-medium">Kamerani shtrix-kodga qarating</p>
+          )}
+        </div>
+      </div>
+    </MobileOverlay>
   );
 }
-
-import { cn } from '@/lib/utils';
 
 export function ScanButton({
   onClick, className,
 }: { onClick: () => void; className?: string }) {
   return (
-    <Button 
-      type="button" 
-      variant="outline" 
-      size="icon" 
-      onClick={onClick} 
-      title="Skanerlash" 
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={onClick}
+      title="Skanerlash"
+      aria-label="Skanerlash"
       className={cn('h-11 w-11 rounded-xl shadow-sm border-border bg-card', className)}
     >
       <Camera className="h-5 w-5 text-primary" />

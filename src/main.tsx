@@ -10,7 +10,13 @@ Sentry.init({
 });
 
 createRoot(document.getElementById("root")!).render(
-  <Sentry.ErrorBoundary fallback={<p>应用发生错误，请刷新页面重试</p>}>
+  <Sentry.ErrorBoundary
+    fallback={
+      <div style={{ padding: 24, textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
+        <p>Dasturda xatolik yuz berdi. Sahifani yangilab ko'ring.</p>
+      </div>
+    }
+  >
     <AppWrapper>
       <App />
     </AppWrapper>

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { Role } from '@/lib/api';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import SellPage from './pages/SellPage';
@@ -18,7 +19,7 @@ export interface RouteConfig {
   element: ReactNode;
   visible?: boolean;
   public?: boolean;
-  roles?: string[];
+  roles?: Role[];
 }
 
 export const routes: RouteConfig[] = [
@@ -30,7 +31,7 @@ export const routes: RouteConfig[] = [
   { name: 'Debts', path: '/debts', element: <DebtsPage /> },
   { name: 'Stock Movements', path: '/stock-movements', element: <StockMovementsPage /> },
   { name: 'Reports', path: '/reports', element: <ReportsPage /> },
-  { name: 'Profit', path: '/profit', element: <ProfitPage />, roles: ['ADMIN', 'SUPER_ADMIN'] },
+  { name: 'Profit', path: '/profit', element: <ProfitPage />, roles: ['SUPER_ADMIN'] },
   { name: 'SMS', path: '/sms', element: <SmsPage /> },
   { name: 'Users', path: '/users', element: <UsersPage />, roles: ['SUPER_ADMIN'] },
   { name: 'Settings', path: '/settings', element: <SettingsPage /> },

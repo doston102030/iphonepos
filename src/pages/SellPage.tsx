@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Search, ShoppingCart, Minus, Plus, Package } from 'lucide-react';
+import { Search, ShoppingCart, Minus, Plus, Package, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,66 +8,66 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage
+  Form, FormControl, FormField, FormItem
 } from '@/components/ui/form';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
+import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { useCart } from '@/contexts/CartContext';
 import { productsApi, ordersApi, type ProductResponse, extractContent } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
 
+// The API's paymentMethod also allows MIXED, but that needs a paidAmount split
+// this screen does not collect — so it is not offered here.
 const checkoutSchema = z.object({
-  paymentType: z.enum(['CASH', 'CARD', 'DEBT']),
+  paymentMethod: z.enum(['CASH', 'CARD', 'CREDIT']),
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
 }).refine(data => {
-  if (data.paymentType === 'DEBT') return !!data.customerName && !!data.customerPhone;
+  if (data.paymentMethod === 'CREDIT') return !!data.customerName && !!data.customerPhone;
   return true;
-}, { message: "Qarz to'lovda mijoz ma'lumotlari shart", path: ['customerName'] });
+}, { message: "Qarzga sotuvda mijoz ma'lumotlari shart", path: ['customerName'] });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 
 function ProductGridCard({ product }: { product: ProductResponse }) {
   const { quantityOf, addItem, decrementItem } = useCart();
   const qty = quantityOf(product.id);
-  const outOfStock = product.quantity <= 0;
+  const outOfStock = product.stockQuantity <= 0;
 
   return (
-    <Card className="shadow-card relative">
-      <CardContent className="p-3.5">
+    <Card className={cn('shadow-card relative rounded-2xl', outOfStock && 'opacity-60')}>
+      <CardContent className="p-3">
         {qty > 0 && (
           <span className="absolute -top-2 -right-2 h-6 min-w-6 px-1 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-hover z-10">
             {qty}
           </span>
         )}
-        <div className="h-12 w-12 rounded-2xl bg-gradient-primary flex items-center justify-center mb-2.5">
-          <Package className="h-6 w-6 text-white" />
+        <div className="h-11 w-11 rounded-2xl bg-gradient-primary flex items-center justify-center mb-2.5">
+          <Package className="h-5 w-5 text-white" />
         </div>
-        <p className="text-sm font-semibold truncate">{product.name}</p>
-        <p className="text-sm font-bold text-primary mt-0.5">{formatCurrency(product.price)}</p>
+        <p className="text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</p>
+        <p className="text-sm font-bold text-brand mt-1">{formatCurrency(product.price)}</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">
-          {outOfStock ? 'Tugagan' : `${product.quantity} ${product.unit}`}
+          {outOfStock ? 'Tugagan' : `${product.stockQuantity} dona`}
         </p>
-        <div className="flex items-center gap-2 mt-2.5">
+        <div className="flex items-center gap-2 mt-3">
           <button
             type="button"
+            aria-label="Kamaytirish"
             disabled={qty === 0}
             onClick={() => decrementItem(product.id)}
-            className="flex-1 h-8 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center disabled:opacity-30 transition-opacity"
+            className="flex-1 h-10 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center disabled:opacity-30 press"
           >
             <Minus className="h-4 w-4" />
           </button>
           <button
             type="button"
-            disabled={outOfStock}
+            aria-label="Qo'shish"
+            disabled={outOfStock || qty >= product.stockQuantity}
             onClick={() => addItem(product)}
-            className="flex-1 h-8 rounded-lg bg-success/10 text-success flex items-center justify-center disabled:opacity-30 transition-opacity"
+            className="flex-1 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center disabled:opacity-30 press"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -77,36 +77,36 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
   );
 }
 
-import { MobileOverlay } from '@/components/common/MobileOverlay';
-import { Trash2 } from 'lucide-react';
-
 function CheckoutSheet({ open, onOpenChange, onCompleted }: {
   open: boolean; onOpenChange: (v: boolean) => void; onCompleted: () => void;
 }) {
   const { items, totalPrice, clear, addItem, decrementItem, removeItem } = useCart();
   const form = useForm<CheckoutForm>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: { paymentType: 'CASH', customerName: '', customerPhone: '' },
+    defaultValues: { paymentMethod: 'CASH', customerName: '', customerPhone: '' },
   });
-  const paymentType = form.watch('paymentType');
+  const paymentMethod = form.watch('paymentMethod');
 
   useEffect(() => {
-    if (open) form.reset({ paymentType: 'CASH', customerName: '', customerPhone: '' });
+    if (open) form.reset({ paymentMethod: 'CASH', customerName: '', customerPhone: '' });
   }, [open, form]);
 
   async function onSubmit(values: CheckoutForm) {
     if (items.length === 0) return;
-    const insufficientItem = items.find(item => item.quantity > item.product.quantity);
+    const insufficientItem = items.find(item => item.quantity > item.product.stockQuantity);
     if (insufficientItem) {
       toast.error(`${insufficientItem.product.name} uchun ombordagi qoldiq yetarli emas`);
       return;
     }
+    const isCredit = values.paymentMethod === 'CREDIT';
     try {
       await ordersApi.create({
         items: items.map(c => ({ productId: c.product.id, quantity: c.quantity })),
-        paymentType: values.paymentType,
+        paymentMethod: values.paymentMethod,
         customerName: values.customerName || undefined,
         customerPhone: values.customerPhone || undefined,
+        // Qarzga: nothing is paid up front, the balance becomes a debt.
+        paidAmount: isCredit ? 0 : undefined,
       });
       toast.success('Savdo yakunlandi');
       clear();
@@ -122,43 +122,71 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
     onOpenChange(false);
   };
 
-  return (
-    <MobileOverlay open={open} onOpenChange={onOpenChange} title="Savatcha">
-      <div className="flex flex-col h-full bg-muted/10 relative">
-        <div className="absolute top-[-56px] right-4 z-50">
-          {items.length > 0 && (
-            <button onClick={handleClear} className="text-sm font-semibold text-destructive px-2 py-2">
-              Tozalash
-            </button>
-          )}
-        </div>
+  const payButtonClass = (method: CheckoutForm['paymentMethod']) => cn(
+    'h-14 rounded-2xl font-bold text-base transition-colors border-2 press',
+    paymentMethod === method
+      ? 'border-primary bg-primary/10 text-primary'
+      : 'border-border/60 bg-background text-foreground'
+  );
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 pb-32 space-y-4">
+  return (
+    <MobileOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Savatcha"
+      action={items.length > 0 ? (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="text-sm font-semibold text-destructive px-2 py-2 press whitespace-nowrap"
+        >
+          Tozalash
+        </button>
+      ) : undefined}
+    >
+      <div className="flex flex-col h-full bg-muted/10">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
           <div className="bg-background rounded-3xl p-2 space-y-2 shadow-sm border border-border/50">
             {items.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground flex flex-col items-center justify-center opacity-60">
+              <div className="py-10 text-center text-muted-foreground flex flex-col items-center justify-center opacity-60">
                 <ShoppingCart className="h-12 w-12 mb-3" />
                 <p>Savatcha bo'sh</p>
               </div>
             ) : items.map(c => (
               <div key={c.product.id} className="flex flex-col gap-3 p-3 rounded-2xl bg-muted/20">
                 <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1">
-                    <p className="font-bold text-base leading-tight mb-1">{c.product.name}</p>
-                    <p className="text-sm text-muted-foreground">{formatCurrency(c.product.price)} / {c.product.unit}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-base leading-tight mb-1 break-words">{c.product.name}</p>
+                    <p className="text-sm text-muted-foreground">{formatCurrency(c.product.price)} / dona</p>
                   </div>
-                  <button onClick={() => removeItem(c.product.id)} className="p-2 -mt-1 -mr-1 text-muted-foreground hover:text-destructive rounded-xl transition-colors">
+                  <button
+                    type="button"
+                    aria-label="O'chirish"
+                    onClick={() => removeItem(c.product.id)}
+                    className="h-10 w-10 -mt-1 -mr-1 shrink-0 flex items-center justify-center text-muted-foreground hover:text-destructive rounded-xl transition-colors press"
+                  >
                     <Trash2 className="h-5 w-5" />
                   </button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <p className="font-bold text-lg text-primary">{formatCurrency(c.product.price * c.quantity)}</p>
-                  <div className="flex items-center gap-3 bg-background rounded-xl p-1 shadow-sm border border-border/50">
-                    <button type="button" onClick={() => decrementItem(c.product.id)} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-foreground hover:bg-muted/80">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-bold text-lg text-primary min-w-0 truncate">{formatCurrency(c.product.price * c.quantity)}</p>
+                  <div className="flex items-center gap-2 bg-background rounded-xl p-1 shadow-sm border border-border/50 shrink-0">
+                    <button
+                      type="button"
+                      aria-label="Kamaytirish"
+                      onClick={() => decrementItem(c.product.id)}
+                      className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-foreground press"
+                    >
                       <Minus className="h-4 w-4" />
                     </button>
-                    <span className="w-6 text-center font-bold text-base">{c.quantity}</span>
-                    <button type="button" disabled={c.quantity >= c.product.quantity} onClick={() => addItem(c.product)} className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 disabled:opacity-30">
+                    <span className="w-7 text-center font-bold text-base tabular-nums">{c.quantity}</span>
+                    <button
+                      type="button"
+                      aria-label="Qo'shish"
+                      disabled={c.quantity >= c.product.stockQuantity}
+                      onClick={() => addItem(c.product)}
+                      className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center disabled:opacity-30 press"
+                    >
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
@@ -171,25 +199,28 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
             <form id="checkout-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <p className="font-bold text-base mb-3 px-1">To'lov usuli</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => form.setValue('paymentType', 'CASH')} className={cn("h-14 rounded-2xl font-bold text-base transition-all border-2", paymentType === 'CASH' ? "border-primary bg-primary/10 text-primary" : "border-border/50 bg-background text-foreground")}>Naqd</button>
-                  <button type="button" onClick={() => form.setValue('paymentType', 'CARD')} className={cn("h-14 rounded-2xl font-bold text-base transition-all border-2", paymentType === 'CARD' ? "border-primary bg-primary/10 text-primary" : "border-border/50 bg-background text-foreground")}>Karta</button>
-                  <button type="button" disabled className={cn("h-14 rounded-2xl font-bold text-base transition-all border-2 opacity-50", "border-border/50 bg-background text-foreground")}>Aralash</button>
-                  <button type="button" onClick={() => form.setValue('paymentType', 'DEBT')} className={cn("h-14 rounded-2xl font-bold text-base transition-all border-2", paymentType === 'DEBT' ? "border-primary bg-primary/10 text-primary" : "border-border/50 bg-background text-foreground")}>Qarzga</button>
+                <div className="grid grid-cols-3 gap-3">
+                  <button type="button" onClick={() => form.setValue('paymentMethod', 'CASH')} className={payButtonClass('CASH')}>Naqd</button>
+                  <button type="button" onClick={() => form.setValue('paymentMethod', 'CARD')} className={payButtonClass('CARD')}>Karta</button>
+                  <button type="button" onClick={() => form.setValue('paymentMethod', 'CREDIT')} className={payButtonClass('CREDIT')}>Qarzga</button>
                 </div>
               </div>
 
-              {paymentType === 'DEBT' && (
-                <div className="bg-background rounded-3xl p-4 space-y-4 shadow-sm border border-border/50 mt-4">
+              {paymentMethod === 'CREDIT' && (
+                <div className="bg-background rounded-3xl p-4 space-y-4 shadow-sm border border-border/50">
                   <p className="font-bold text-sm text-muted-foreground px-1">Mijoz ma'lumotlari</p>
                   <FormField control={form.control} name="customerName" render={({ field }) => (
                     <FormItem>
-                      <FormControl><Input className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 font-semibold" placeholder="Mijoz ismi" autoComplete="off" {...field} /></FormControl>
+                      <FormControl>
+                        <Input className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 font-semibold" placeholder="Mijoz ismi" autoComplete="off" {...field} />
+                      </FormControl>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="customerPhone" render={({ field }) => (
                     <FormItem>
-                      <FormControl><Input className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 font-semibold" placeholder="+998901234567" autoComplete="off" {...field} /></FormControl>
+                      <FormControl>
+                        <Input className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 font-semibold" type="tel" inputMode="tel" placeholder="+998901234567" autoComplete="off" {...field} />
+                      </FormControl>
                     </FormItem>
                   )} />
                 </div>
@@ -198,21 +229,21 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
           </Form>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border/50 p-4 pb-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-          <div className="flex justify-between items-end mb-4 px-2">
-            <div className="space-y-1">
+        <div className="shrink-0 bg-background border-t border-border/50 px-4 pt-4 pb-4 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] safe-area-bottom">
+          <div className="flex justify-between items-end mb-3 px-1 gap-3">
+            <div className="space-y-1 shrink-0">
               <p className="text-sm text-muted-foreground font-medium">Jami:</p>
               <p className="text-sm text-muted-foreground font-medium">To'lash kerak:</p>
             </div>
-            <div className="space-y-1 text-right">
-              <p className="text-sm font-bold">{formatCurrency(totalPrice)}</p>
-              <p className="text-xl font-black text-success">{formatCurrency(totalPrice)}</p>
+            <div className="space-y-1 text-right min-w-0">
+              <p className="text-sm font-bold truncate">{formatCurrency(totalPrice)}</p>
+              <p className="text-xl font-black text-success truncate">{formatCurrency(totalPrice)}</p>
             </div>
           </div>
           <Button
             type="submit"
             form="checkout-form"
-            className="w-full h-16 rounded-[1.25rem] text-xl font-bold bg-success hover:bg-success/90 shadow-lg shadow-success/20"
+            className="w-full h-14 rounded-2xl text-lg font-bold bg-success hover:bg-success/90 shadow-lg shadow-success/20"
             disabled={form.formState.isSubmitting || items.length === 0}
           >
             {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Buyurtmani tasdiqlash'}
@@ -248,20 +279,20 @@ export default function SellPage() {
     return () => clearTimeout(t);
   }, [search, load]);
 
-  async function handleScanned(barcode: string) {
+  const handleScanned = useCallback(async (barcode: string) => {
     try {
       const product = await productsApi.getByBarcode(barcode);
-      if (!product) { toast.error("Bu shtrix-kodli mahsulot topilmadi"); return; }
+      if (!product) { toast.error('Bu shtrix-kodli mahsulot topilmadi'); return; }
       addItem(product);
       toast.success(`${product.name} savatchaga qo'shildi`);
     } catch {
-      toast.error("Bu shtrix-kodli mahsulot topilmadi");
+      toast.error('Bu shtrix-kodli mahsulot topilmadi');
     }
-  }
+  }, [addItem]);
 
   return (
     <MainLayout>
-      <div className={cn('p-6', totalCount > 0 && 'pb-28')}>
+      <div className={cn('p-4 md:p-6', totalCount > 0 && 'pb-24')}>
         <PageHeader
           title="Sotish"
           description="Mahsulotlarni tanlab tezkor savdo qiling"
@@ -269,9 +300,9 @@ export default function SellPage() {
         />
 
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            className="pl-9"
+            className="pl-9 h-12 rounded-xl md:h-9"
             placeholder="Mahsulot qidirish..."
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -280,7 +311,7 @@ export default function SellPage() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
           {loading ? (
-            Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[168px] rounded-xl" />)
+            Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[190px] rounded-2xl" />)
           ) : products.length === 0 ? (
             <p className="col-span-full text-center py-10 text-sm text-muted-foreground">Mahsulot topilmadi</p>
           ) : products.map(p => <ProductGridCard key={p.id} product={p} />)}
@@ -288,15 +319,12 @@ export default function SellPage() {
       </div>
 
       {totalCount > 0 && (
-        <div className="absolute bottom-0 left-0 right-0 h-32 md:hidden bg-gradient-to-t from-muted/30 via-muted/20 to-transparent pointer-events-none z-20" />
-      )}
-      {totalCount > 0 && (
         <button
           type="button"
           onClick={() => setCheckoutOpen(true)}
-          className="absolute bottom-[4.5rem] md:bottom-6 left-1/2 md:left-auto md:right-6 -translate-x-1/2 md:translate-x-0 w-[calc(100%-2rem)] max-w-sm z-30 flex items-center justify-between px-5 h-14 rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-primary/30 ring-1 ring-black/5 hover:opacity-95 transition-opacity"
+          className="fixed md:absolute bottom-above-nav md:bottom-6 left-1/2 md:left-auto md:right-6 -translate-x-1/2 md:translate-x-0 w-[calc(100%-2rem)] max-w-[398px] md:max-w-sm z-30 flex items-center justify-between gap-3 px-5 h-14 rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-primary/30 ring-1 ring-black/5 press"
         >
-          <div className="flex items-center gap-3">
+          <span className="flex items-center gap-3 shrink-0">
             <span className="relative flex items-center justify-center">
               <ShoppingCart className="h-5 w-5" />
               <span className="absolute -top-2 -right-2 h-4 min-w-4 px-1 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center shadow-sm">
@@ -304,8 +332,8 @@ export default function SellPage() {
               </span>
             </span>
             <span className="font-semibold text-sm">Savatcha</span>
-          </div>
-          <span className="font-bold text-base">{formatCurrency(totalPrice)}</span>
+          </span>
+          <span className="font-bold text-base truncate">{formatCurrency(totalPrice)}</span>
         </button>
       )}
 

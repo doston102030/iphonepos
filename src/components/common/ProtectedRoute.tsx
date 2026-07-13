@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import type { Role } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function ProtectedRoute({
@@ -7,7 +8,7 @@ export function ProtectedRoute({
   allowedRoles,
 }: {
   children: React.ReactNode;
-  allowedRoles?: string[];
+  allowedRoles?: Role[];
 }) {
   const { isAuthenticated, user } = useAuth();
   const location = useLocation();
@@ -16,7 +17,7 @@ export function ProtectedRoute({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user?.role ?? '')) {
+  if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
     return <Navigate to="/" replace />;
   }
 

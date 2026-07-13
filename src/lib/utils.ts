@@ -1,11 +1,12 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { OutflowReason, PaymentMethod, Role } from '@/lib/api';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency = "UZS"): string {
+export function formatCurrency(amount: number, currency = "so'm"): string {
   return new Intl.NumberFormat('uz-UZ', {
     style: 'decimal',
     minimumFractionDigits: 0,
@@ -36,24 +37,37 @@ export function formatDateTime(dateStr: string): string {
   }
 }
 
-export function getRoleBadgeVariant(role: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (role === 'SUPER_ADMIN') return 'destructive';
-  if (role === 'ADMIN') return 'default';
-  return 'secondary';
+// The server has exactly two roles, four payment methods and three outflow
+// reasons — each map below is total, so no fallback branch is needed.
+export function getRoleBadgeVariant(role: Role): 'default' | 'secondary' | 'destructive' | 'outline' {
+  return role === 'SUPER_ADMIN' ? 'destructive' : 'secondary';
 }
 
-export function getRoleLabel(role: string): string {
-  if (role === 'SUPER_ADMIN') return 'Super Admin';
-  if (role === 'ADMIN') return 'Admin';
-  if (role === 'KASSIR') return 'Kassir';
-  return role;
+export function getRoleLabel(role: Role): string {
+  const labels: Record<Role, string> = {
+    SUPER_ADMIN: 'Super Admin',
+    CASHIER: 'Kassir',
+  };
+  return labels[role];
 }
 
-export function getPaymentTypeLabel(type: string): string {
-  if (type === 'CASH') return 'Naqd';
-  if (type === 'CARD') return 'Karta';
-  if (type === 'DEBT') return 'Qarz';
-  return type;
+export function getPaymentMethodLabel(method: PaymentMethod): string {
+  const labels: Record<PaymentMethod, string> = {
+    CASH: 'Naqd',
+    CARD: 'Karta',
+    MIXED: 'Aralash',
+    CREDIT: 'Qarzga',
+  };
+  return labels[method];
+}
+
+export function getOutflowReasonLabel(reason: OutflowReason): string {
+  const labels: Record<OutflowReason, string> = {
+    DAMAGED: 'Buzilgan',
+    LOST: "Yo'qolgan",
+    RETURNED: 'Qaytarilgan',
+  };
+  return labels[reason];
 }
 
 export function getStockMovementTypeLabel(type: string): string {

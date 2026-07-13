@@ -13,7 +13,8 @@ import {
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
-  reportsApi, type SalesReportResponse, type DailySalesResponse, type ProfitByProductResponse,
+  reportsApi, totalCost, marginPct,
+  type SalesReportResponse, type DailySalesResponse,
 } from '@/lib/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import {
@@ -42,10 +43,10 @@ function KpiCard({
   title, value, sub, icon, tone = 'default',
 }: { title: string; value: string; sub?: string; icon: React.ReactNode; tone?: 'default' | 'success' | 'destructive' }) {
   return (
-    <Card className="shadow-card">
+    <Card className="shadow-card rounded-2xl">
       <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <p className="text-xs text-muted-foreground font-medium">{title}</p>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <p className="text-xs text-muted-foreground font-medium leading-tight">{title}</p>
           <span className={cn(
             'h-7 w-7 rounded-md flex items-center justify-center shrink-0',
             tone === 'success' ? 'bg-success/10 text-success' :
@@ -67,7 +68,6 @@ export default function ProfitPage() {
   const [customTo, setCustomTo] = useState(todayStr());
   const [summary, setSummary] = useState<SalesReportResponse | null>(null);
   const [daily, setDaily] = useState<DailySalesResponse[]>([]);
-  const [byProduct, setByProduct] = useState<ProfitByProductResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
 
@@ -76,12 +76,11 @@ export default function ProfitPage() {
     if (!from || !to) return;
     setLoading(true);
     try {
-      const [s, d, p] = await Promise.all([
+      const [s, d] = await Promise.all([
         reportsApi.range(from, to),
         reportsApi.rangeDaily(from, to),
-        reportsApi.profitByProduct(from, to),
       ]);
-      setSummary(s); setDaily(d); setByProduct(p);
+      setSummary(s); setDaily(d);
     } catch {
       toast.error('Foyda hisoboti yuklanmadi');
     } finally { setLoading(false); }
@@ -89,8 +88,10 @@ export default function ProfitPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const marginPct = summary && summary.totalRevenue > 0
-    ? Math.round((summary.totalProfit / summary.totalRevenue) * 1000) / 10 : 0;
+  // Tannarx va marja server tomonidan yuborilmaydi — daromad/foydadan hisoblanadi.
+  const cost = summary ? totalCost(summary) : 0;
+  const margin = summary ? marginPct(summary) : 0;
+  const topProducts = summary?.topProducts ?? [];
 
   const chartData = daily.map(d => ({
     date: formatDate(d.date),
@@ -100,62 +101,64 @@ export default function ProfitPage() {
 
   return (
     <MainLayout>
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader title="Foyda / Zarar" description="Tannarx va sotish narxi asosida foyda tahlili" />
 
         <Tabs value={period} onValueChange={v => setPeriod(v as Period)} className="mb-4">
-          <TabsList>
+          <TabsList className="grid grid-cols-4 w-full h-11 md:inline-flex md:w-auto md:h-9">
             <TabsTrigger value="today">Bugun</TabsTrigger>
             <TabsTrigger value="week">Hafta</TabsTrigger>
             <TabsTrigger value="month">Oy</TabsTrigger>
             <TabsTrigger value="range">Oraliq</TabsTrigger>
           </TabsList>
           <TabsContent value="range">
-            <div className="flex flex-wrap items-end gap-3 mt-3">
-              <div>
-                <Label className="text-xs mb-1 block">Dan</Label>
-                <Input type="date" className="w-44" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+            <div className="space-y-3 mt-3">
+              <div className="grid grid-cols-2 gap-3 sm:flex sm:items-end">
+                <div className="min-w-0">
+                  <Label className="text-xs mb-1 block">Dan</Label>
+                  <Input type="date" className="w-full h-12 rounded-xl sm:w-44 md:h-9" value={customFrom} onChange={e => setCustomFrom(e.target.value)} max={customTo || todayStr()} />
+                </div>
+                <div className="min-w-0">
+                  <Label className="text-xs mb-1 block">Gacha</Label>
+                  <Input type="date" className="w-full h-12 rounded-xl sm:w-44 md:h-9" value={customTo} onChange={e => setCustomTo(e.target.value)} max={todayStr()} />
+                </div>
               </div>
-              <div>
-                <Label className="text-xs mb-1 block">Gacha</Label>
-                <Input type="date" className="w-44" value={customTo} onChange={e => setCustomTo(e.target.value)} max={todayStr()} />
-              </div>
-              <Button size="sm" onClick={load}>Ko'rish</Button>
+              <Button onClick={load} className="w-full sm:w-auto">Ko'rish</Button>
             </div>
           </TabsContent>
         </Tabs>
 
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="shadow-card"><CardContent className="p-4"><Skeleton className="h-14 w-full" /></CardContent></Card>
+              <Card key={i} className="shadow-card rounded-2xl"><CardContent className="p-4"><Skeleton className="h-14 w-full" /></CardContent></Card>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
             <KpiCard title="Jami savdo" value={formatCurrency(summary?.totalRevenue ?? 0)} icon={<Wallet className="h-3.5 w-3.5" />} />
-            <KpiCard title="Tannarx" value={formatCurrency(summary?.totalCost ?? 0)} icon={<TrendingDown className="h-3.5 w-3.5" />} />
+            <KpiCard title="Tannarx" value={formatCurrency(cost)} icon={<TrendingDown className="h-3.5 w-3.5" />} />
             <KpiCard
               title="Sof foyda" value={formatCurrency(summary?.totalProfit ?? 0)}
               icon={<TrendingUp className="h-3.5 w-3.5" />}
               tone={(summary?.totalProfit ?? 0) >= 0 ? 'success' : 'destructive'}
             />
             <KpiCard
-              title="Marja" value={`${marginPct}%`} sub={`${summary?.totalOrders ?? 0} ta buyurtma`}
+              title="Marja" value={`${margin}%`} sub={`${summary?.totalOrders ?? 0} ta buyurtma`}
               icon={<Percent className="h-3.5 w-3.5" />}
-              tone={marginPct >= 0 ? 'success' : 'destructive'}
+              tone={margin >= 0 ? 'success' : 'destructive'}
             />
           </div>
         )}
 
         {loading ? (
-          <Skeleton className="h-64 w-full mb-6" />
+          <Skeleton className="h-64 w-full mb-6 rounded-2xl" />
         ) : chartData.length > 0 && (
-          <Card className="shadow-card mb-6">
+          <Card className="shadow-card mb-6 rounded-2xl">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold">Kunlar bo'yicha daromad va foyda</CardTitle>
             </CardHeader>
-            <CardContent className="pt-0 pb-2">
+            <CardContent className="pt-0 pb-2 px-2 md:px-6">
               <div className="w-full min-w-0 overflow-hidden">
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -173,31 +176,26 @@ export default function ProfitPage() {
           </Card>
         )}
 
-        <Card className="shadow-card">
+        <Card className="shadow-card rounded-2xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Mahsulotlar bo'yicha foyda</CardTitle>
+            <CardTitle className="text-sm font-semibold">Eng ko'p sotilgan mahsulotlar</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
               <div className="p-4 space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
-            ) : byProduct.length === 0 ? (
+            ) : topProducts.length === 0 ? (
               <p className="text-center py-8 text-muted-foreground text-sm">Ma'lumot yo'q</p>
             ) : isMobile ? (
               <div className="divide-y divide-border">
-                {byProduct.map(p => (
-                  <div key={p.productId} className="p-3.5">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <p className="text-sm font-semibold truncate">{p.productName}</p>
-                      <span className={cn('text-sm font-bold shrink-0', p.profit >= 0 ? 'text-success' : 'text-destructive')}>
-                        {formatCurrency(p.profit)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>{p.quantitySold} dona sotildi</span>
-                      <span>Marja: {p.marginPct}%</span>
-                    </div>
+                {topProducts.map((p, i) => (
+                  <div key={p.productId} className="p-3.5 flex items-center gap-3">
+                    <span className="h-7 w-7 shrink-0 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
+                      {i + 1}
+                    </span>
+                    <p className="text-sm font-semibold truncate flex-1 min-w-0">{p.productName}</p>
+                    <span className="text-sm font-bold shrink-0">{p.quantitySold} dona</span>
                   </div>
                 ))}
               </div>
@@ -206,25 +204,17 @@ export default function ProfitPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="whitespace-nowrap w-12">#</TableHead>
                       <TableHead className="whitespace-nowrap">Mahsulot</TableHead>
-                      <TableHead className="whitespace-nowrap">Sotilgan</TableHead>
-                      <TableHead className="whitespace-nowrap">Daromad</TableHead>
-                      <TableHead className="whitespace-nowrap">Tannarx</TableHead>
-                      <TableHead className="whitespace-nowrap">Foyda</TableHead>
-                      <TableHead className="whitespace-nowrap">Marja</TableHead>
+                      <TableHead className="whitespace-nowrap text-right">Sotilgan</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {byProduct.map(p => (
+                    {topProducts.map((p, i) => (
                       <TableRow key={p.productId}>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">{i + 1}</TableCell>
                         <TableCell className="whitespace-nowrap font-medium">{p.productName}</TableCell>
-                        <TableCell className="whitespace-nowrap">{p.quantitySold}</TableCell>
-                        <TableCell className="whitespace-nowrap">{formatCurrency(p.revenue)}</TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">{formatCurrency(p.cost)}</TableCell>
-                        <TableCell className={cn('whitespace-nowrap font-semibold', p.profit >= 0 ? 'text-success' : 'text-destructive')}>
-                          {formatCurrency(p.profit)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">{p.marginPct}%</TableCell>
+                        <TableCell className="whitespace-nowrap text-right font-semibold">{p.quantitySold} dona</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

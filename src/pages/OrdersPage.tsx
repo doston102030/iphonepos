@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,9 +15,21 @@ import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { PaginationControls } from '@/components/common/PaginationControls';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
 import {
-  ordersApi, type OrderResponse, extractContent, extractPage
+  ordersApi, type OrderResponse, type PaymentMethod, extractContent, extractPage
 } from '@/lib/api';
-import { formatCurrency, formatDateTime, getPaymentTypeLabel } from '@/lib/utils';
+import { formatCurrency, formatDateTime, getPaymentMethodLabel } from '@/lib/utils';
+
+type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
+
+function paymentBadgeVariant(method: PaymentMethod): BadgeVariant {
+  const variants: Record<PaymentMethod, BadgeVariant> = {
+    CASH: 'default',
+    CARD: 'secondary',
+    MIXED: 'outline',
+    CREDIT: 'destructive',
+  };
+  return variants[method];
+}
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderResponse[]>([]);
@@ -43,27 +55,21 @@ export default function OrdersPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const paymentBadgeVariant = (type: string) => {
-    if (type === 'CASH') return 'default';
-    if (type === 'CARD') return 'secondary';
-    return 'destructive';
-  };
-
   return (
     <MainLayout>
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader
           title="Buyurtmalar"
           description="Barcha buyurtmalar ro'yxati"
           action={
-            <Button size="sm" onClick={() => navigate('/sell')}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              Yangi buyurtma
+            <Button aria-label="Yangi buyurtma" onClick={() => navigate('/sell')}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Yangi buyurtma</span>
             </Button>
           }
         />
 
-        <Card className="shadow-card">
+        <Card className="shadow-card rounded-2xl">
           <CardContent className="p-0">
             {isMobile ? (
               <div className="divide-y divide-border">
@@ -78,17 +84,17 @@ export default function OrdersPage() {
                     key={o.id}
                     type="button"
                     onClick={() => setViewOrder(o)}
-                    className="w-full text-left p-3.5 active:bg-muted transition-colors"
+                    className="w-full text-left p-4 min-h-[3.75rem] active:bg-muted transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold">#{o.id} · {o.cashierName}</p>
+                        <p className="text-sm font-semibold truncate">#{o.id}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{formatDateTime(o.createdAt)}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-bold text-accent">{formatCurrency(o.totalPrice)}</p>
-                        <Badge variant={paymentBadgeVariant(o.paymentType)} className="mt-1">
-                          {getPaymentTypeLabel(o.paymentType)}
+                        <p className="text-sm font-bold text-brand">{formatCurrency(o.totalAmount)}</p>
+                        <Badge variant={paymentBadgeVariant(o.paymentMethod)} className="mt-1">
+                          {getPaymentMethodLabel(o.paymentMethod)}
                         </Badge>
                       </div>
                     </div>
@@ -101,7 +107,6 @@ export default function OrdersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="whitespace-nowrap">ID</TableHead>
-                    <TableHead className="whitespace-nowrap">Kassir</TableHead>
                     <TableHead className="whitespace-nowrap">Umumiy summa</TableHead>
                     <TableHead className="whitespace-nowrap">To'lov turi</TableHead>
                     <TableHead className="whitespace-nowrap">Sana</TableHead>
@@ -112,25 +117,24 @@ export default function OrdersPage() {
                   {loading ? (
                     Array.from({ length: 6 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: 6 }).map((__, j) => (
+                        {Array.from({ length: 5 }).map((__, j) => (
                           <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                         ))}
                       </TableRow>
                     ))
                   ) : orders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
                         Buyurtma topilmadi
                       </TableCell>
                     </TableRow>
                   ) : orders.map(o => (
                     <TableRow key={o.id}>
                       <TableCell className="whitespace-nowrap font-mono text-xs">#{o.id}</TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">{o.cashierName}</TableCell>
-                      <TableCell className="whitespace-nowrap font-semibold">{formatCurrency(o.totalPrice)}</TableCell>
+                      <TableCell className="whitespace-nowrap font-semibold">{formatCurrency(o.totalAmount)}</TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <Badge variant={paymentBadgeVariant(o.paymentType)}>
-                          {getPaymentTypeLabel(o.paymentType)}
+                        <Badge variant={paymentBadgeVariant(o.paymentMethod)}>
+                          {getPaymentMethodLabel(o.paymentMethod)}
                         </Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -168,25 +172,39 @@ export default function OrdersPage() {
         {viewOrder && (
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-              <div><span className="text-muted-foreground">Kassir:</span> <span className="font-medium">{viewOrder.cashierName}</span></div>
               <div><span className="text-muted-foreground">Sana:</span> <span className="font-medium">{formatDateTime(viewOrder.createdAt)}</span></div>
-              <div><span className="text-muted-foreground">To'lov:</span> <Badge variant={viewOrder.paymentType === 'DEBT' ? 'destructive' : 'default'}>{getPaymentTypeLabel(viewOrder.paymentType)}</Badge></div>
-              {viewOrder.customerName && <div><span className="text-muted-foreground">Mijoz:</span> <span className="font-medium">{viewOrder.customerName}</span></div>}
-              {viewOrder.customerPhone && <div><span className="text-muted-foreground">Telefon:</span> <span className="font-medium">{viewOrder.customerPhone}</span></div>}
+              <div>
+                <span className="text-muted-foreground">To'lov:</span>{' '}
+                <Badge variant={paymentBadgeVariant(viewOrder.paymentMethod)}>
+                  {getPaymentMethodLabel(viewOrder.paymentMethod)}
+                </Badge>
+              </div>
             </div>
             <Separator />
             <div className="space-y-1">
               {(viewOrder.items ?? []).map((item, i) => (
-                <div key={i} className="flex justify-between text-sm">
-                  <span>{item.productName} × {item.quantity}</span>
-                  <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
+                <div key={i} className="flex justify-between text-sm gap-3">
+                  <span className="min-w-0">{item.productName} × {item.quantity}</span>
+                  <span className="font-medium shrink-0">{formatCurrency(item.unitPrice * item.quantity)}</span>
                 </div>
               ))}
             </div>
             <Separator />
-            <div className="flex justify-between font-bold">
-              <span>Jami:</span>
-              <span className="text-accent">{formatCurrency(viewOrder.totalPrice)}</span>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Oraliq summa:</span>
+                <span className="font-medium text-right">{formatCurrency(viewOrder.subtotal)}</span>
+              </div>
+              {viewOrder.discountAmount > 0 && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Chegirma:</span>
+                  <span className="font-medium text-right">-{formatCurrency(viewOrder.discountAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold gap-3 pt-1">
+                <span>Jami:</span>
+                <span className="text-brand text-right">{formatCurrency(viewOrder.totalAmount)}</span>
+              </div>
             </div>
           </div>
         )}

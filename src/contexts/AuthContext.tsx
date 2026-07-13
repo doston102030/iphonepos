@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { Role } from '@/lib/api';
 
+/** Exactly the shape of LoginResponse — the server sends nothing else. */
 export interface AuthUser {
+  id: number;
   token: string;
-  role: string;
-  username: string;
+  fullName: string;
+  role: Role;
 }
 
 interface AuthContextValue {
@@ -12,8 +15,7 @@ interface AuthContextValue {
   login: (user: AuthUser) => void;
   logout: () => void;
   isSuperAdmin: boolean;
-  isAdmin: boolean;
-  isKassir: boolean;
+  isCashier: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -54,9 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     login,
     logout,
+    // The API knows only SUPER_ADMIN and CASHIER — there is no ADMIN tier.
     isSuperAdmin: user?.role === 'SUPER_ADMIN',
-    isAdmin: user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN',
-    isKassir: user?.role === 'KASSIR' || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN',
+    isCashier: user?.role === 'CASHIER',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

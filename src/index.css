@@ -44,8 +44,13 @@
     --secondary-foreground: 0 0% 100%;
     --muted: 258 20% 95%;
     --muted-foreground: 240 8% 46%;
-    --accent: 38 92% 44%;
+    /* `accent` is the neutral hover/focus surface used by every shadcn control
+       (ghost buttons, select items, menu items). It must stay low-contrast. */
+    --accent: 258 22% 94%;
     --accent-foreground: 222 47% 8%;
+    /* `brand` is the amber highlight used for money/KPI emphasis. */
+    --brand: 38 92% 44%;
+    --brand-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 258 15% 89%;
@@ -87,8 +92,10 @@
     --secondary-foreground: 0 0% 100%;
     --muted: 258 20% 18%;
     --muted-foreground: 258 12% 65%;
-    --accent: 38 85% 48%;
-    --accent-foreground: 222 47% 8%;
+    --accent: 258 20% 20%;
+    --accent-foreground: 210 30% 94%;
+    --brand: 38 85% 52%;
+    --brand-foreground: 222 47% 8%;
     --destructive: 0 62% 40%;
     --destructive-foreground: 0 0% 100%;
     --border: 258 20% 22%;
@@ -119,11 +126,22 @@
 }
 
 @layer base {
+  :root {
+    /* Height the mobile tab bar occupies, including the iPhone home indicator.
+       Pages pad their scroll area by this so nothing hides behind the bar. */
+    --bottom-nav-h: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
   * {
     @apply border-border;
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
+
+  html {
+    height: -webkit-fill-available;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'BeVietnamPro', system-ui, sans-serif;
@@ -131,12 +149,37 @@
     line-height: 1.5;
     -webkit-tap-highlight-color: transparent;
     -webkit-overflow-scrolling: touch;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
     overscroll-behavior-y: none;
   }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: 'HarmonyOSSans', 'BeVietnamPro', system-ui, sans-serif;
     font-weight: 700;
     line-height: 1.25;
+  }
+
+  /* Native-app feel: no double-tap zoom delay, no accidental text selection
+     when dragging a card, and no long-press callout on iOS. */
+  button, a, [role='button'], [role='tab'] {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+  }
+  button, [role='button'], [role='tab'] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* iOS Safari zooms the page when a focused field is under 16px. Inputs ship
+     with text-base, but selects/textareas need the same floor. */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 768px) {
+    input, select, textarea {
+      font-size: inherit;
+    }
   }
 }
 
@@ -169,5 +212,30 @@
   }
   .safe-area-mb {
     margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Clears the mobile tab bar (bar height + home indicator). */
+  .pb-nav {
+    padding-bottom: var(--bottom-nav-h);
+  }
+  /* Sits a floating element directly above the tab bar. */
+  .bottom-above-nav {
+    bottom: calc(var(--bottom-nav-h) + 0.5rem);
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* iOS-style press feedback for tappable surfaces that aren't <Button>.
+     Uses Tailwind's scale utility rather than a raw `transform`, so it composes
+     with existing translates instead of wiping them (e.g. a -translate-x-1/2
+     centered button would otherwise jump sideways while pressed). */
+  .press {
+    @apply transition-transform duration-150 active:scale-[0.97];
   }
 }

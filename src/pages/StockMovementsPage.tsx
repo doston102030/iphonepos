@@ -83,49 +83,53 @@ export default function StockMovementsPage() {
 
   return (
     <MainLayout>
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <PageHeader
           title="Ombor harakatlari"
           description="Mahsulot kirish va chiqishlarini kuzatish"
         />
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Input
-            type="date"
-            className="w-40"
-            value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
-            placeholder="Dan"
-          />
-          <Input
-            type="date"
-            className="w-40"
-            value={toDate}
-            onChange={e => setToDate(e.target.value)}
-            placeholder="Gacha"
-          />
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Harakat turi" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Barchasi</SelectItem>
-              {MOVEMENT_TYPES.map(t => (
-                <SelectItem key={t} value={t}>{getStockMovementTypeLabel(t)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={applyFilters} size="sm">
-            <Filter className="h-4 w-4 mr-1.5" />
-            Filtrlash
-          </Button>
-          {(appliedFilters.from || appliedFilters.to || appliedFilters.type) && (
-            <Button variant="outline" size="sm" onClick={clearFilters}>Tozalash</Button>
-          )}
+        {/* Filters — stack on phones, inline from sm up. */}
+        <div className="space-y-3 mb-4">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+            <Input
+              type="date"
+              aria-label="Dan"
+              className="w-full h-12 rounded-xl sm:w-40 md:h-9"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+            />
+            <Input
+              type="date"
+              aria-label="Gacha"
+              className="w-full h-12 rounded-xl sm:w-40 md:h-9"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+            />
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="col-span-2 w-full h-12 rounded-xl sm:w-40 md:h-9">
+                <SelectValue placeholder="Harakat turi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Barchasi</SelectItem>
+                {MOVEMENT_TYPES.map(t => (
+                  <SelectItem key={t} value={t}>{getStockMovementTypeLabel(t)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={applyFilters} className="flex-1 sm:flex-none">
+              <Filter className="h-4 w-4 mr-1.5" />
+              Filtrlash
+            </Button>
+            {(appliedFilters.from || appliedFilters.to || appliedFilters.type) && (
+              <Button variant="outline" onClick={clearFilters} className="flex-1 sm:flex-none">Tozalash</Button>
+            )}
+          </div>
         </div>
 
-        <Card className="shadow-card">
+        <Card className="shadow-card rounded-2xl">
           <CardContent className="p-0">
             {isMobile ? (
               <div className="divide-y divide-border">
@@ -149,7 +153,14 @@ export default function StockMovementsPage() {
                         </Badge>
                       </div>
                     </div>
-                    {m.note && <p className="text-xs text-muted-foreground mt-1.5 truncate">{m.note}</p>}
+                    {(m.reason || m.performedBy) && (
+                      <div className="flex items-center justify-between gap-2 mt-1.5">
+                        <p className="text-xs text-muted-foreground truncate">{m.reason ?? ''}</p>
+                        {m.performedBy && (
+                          <p className="text-xs text-muted-foreground shrink-0">{m.performedBy}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -163,6 +174,7 @@ export default function StockMovementsPage() {
                     <TableHead className="whitespace-nowrap">Tur</TableHead>
                     <TableHead className="whitespace-nowrap">Miqdor</TableHead>
                     <TableHead className="whitespace-nowrap">Izoh</TableHead>
+                    <TableHead className="whitespace-nowrap">Kim</TableHead>
                     <TableHead className="whitespace-nowrap">Sana</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -170,14 +182,14 @@ export default function StockMovementsPage() {
                   {loading ? (
                     Array.from({ length: 7 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: 6 }).map((__, j) => (
+                        {Array.from({ length: 7 }).map((__, j) => (
                           <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                         ))}
                       </TableRow>
                     ))
                   ) : movements.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
                         Harakat topilmadi
                       </TableCell>
                     </TableRow>
@@ -191,7 +203,8 @@ export default function StockMovementsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap font-semibold">{m.quantity}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-48 truncate">{m.note ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-48 truncate">{m.reason ?? '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{m.performedBy}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(m.createdAt)}</TableCell>
                     </TableRow>
                   ))}
