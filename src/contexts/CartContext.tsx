@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type { ProductResponse } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface CartItem { product: ProductResponse; quantity: number }
 
@@ -19,6 +20,14 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+
+  // A cart belongs to the cashier who built it. "Chiqish" is a client-side
+  // navigation — this provider is never unmounted — so without this the next
+  // cashier logged in to find the previous one's basket waiting, and could ring
+  // it up under their own name.
+  useEffect(() => { setItems([]); }, [userId]);
 
   const addItem = useCallback((product: ProductResponse) => {
     setItems(prev => {

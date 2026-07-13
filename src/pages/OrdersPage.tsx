@@ -32,7 +32,7 @@ function paymentBadgeVariant(method: PaymentMethod): BadgeVariant {
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<OrderResponse[]>([]);
+  const [orders, setOrders] = useState<OrderResponse[] | null>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -49,7 +49,12 @@ export default function OrdersPage() {
       const pg = extractPage(res);
       setTotalPages(pg.totalPages);
       setTotalElements(pg.totalElements);
-    } catch { toast.error('Buyurtmalar yuklanmadi'); }
+    } catch {
+      // null, not []: "Buyurtma topilmadi" would state that the shop has no
+      // orders, which is a very different thing from a failed request.
+      setOrders(null);
+      toast.error('Buyurtmalar yuklanmadi');
+    }
     finally { setLoading(false); }
   }, [page]);
 
@@ -77,6 +82,11 @@ export default function OrdersPage() {
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="p-4"><Skeleton className="h-14 w-full" /></div>
                   ))
+                ) : !orders ? (
+                  <div className="flex flex-col items-center py-8 gap-3">
+                    <p className="text-sm text-muted-foreground">Buyurtmalar yuklanmadi</p>
+                    <Button variant="outline" size="sm" className="press" onClick={load}>Qayta urinish</Button>
+                  </div>
                 ) : orders.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground text-sm">Buyurtma topilmadi</p>
                 ) : orders.map(o => (
@@ -122,6 +132,15 @@ export default function OrdersPage() {
                         ))}
                       </TableRow>
                     ))
+                  ) : !orders ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
+                        Buyurtmalar yuklanmadi —{' '}
+                        <button type="button" className="text-primary font-medium underline" onClick={load}>
+                          qayta urinish
+                        </button>
+                      </TableCell>
+                    </TableRow>
                   ) : orders.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-sm">

@@ -9,25 +9,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Form, FormControl, FormField, FormItem
+  Form, FormControl, FormField, FormItem, FormMessage
 } from '@/components/ui/form';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { useCart } from '@/contexts/CartContext';
-import { productsApi, ordersApi, type ProductResponse, extractContent } from '@/lib/api';
+import { productsApi, ordersApi, fetchAllPages, type ProductResponse } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
 
 // The API's paymentMethod also allows MIXED, but that needs a paidAmount split
 // this screen does not collect — so it is not offered here.
+// One refine per field, so the message lands on the input that is actually empty
+// — a single error pinned to customerName left an empty phone field unmarked.
 const checkoutSchema = z.object({
   paymentMethod: z.enum(['CASH', 'CARD', 'CREDIT']),
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
-}).refine(data => {
-  if (data.paymentMethod === 'CREDIT') return !!data.customerName && !!data.customerPhone;
-  return true;
-}, { message: "Qarzga sotuvda mijoz ma'lumotlari shart", path: ['customerName'] });
+})
+  .refine(d => d.paymentMethod !== 'CREDIT' || !!d.customerName?.trim(), {
+    message: "Qarzga sotuvda mijoz ismi shart", path: ['customerName'],
+  })
+  .refine(d => d.paymentMethod !== 'CREDIT' || !!d.customerPhone?.trim(), {
+    message: 'Telefon raqami shart', path: ['customerPhone'],
+  });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 
@@ -206,11 +211,15 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
               {paymentMethod === 'CREDIT' && (
                 <div className="bg-background rounded-3xl p-4 space-y-4 shadow-sm border border-border/50">
                   <p className="font-bold text-sm text-muted-foreground px-1">Mijoz ma'lumotlari</p>
+                  {/* Without these, the zod refine below silently blocked the
+                      submit: the cashier pressed "Tasdiqlash" and nothing at all
+                      happened — no message, no toast, a dead button mid-sale. */}
                   <FormField control={form.control} name="customerName" render={({ field }) => (
                     <FormItem>
                       <FormControl>
                         <Input className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 font-semibold" placeholder="Mijoz ismi" autoComplete="off" {...field} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="customerPhone" render={({ field }) => (
@@ -218,6 +227,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
                       <FormControl>
                         <Input className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 font-semibold" type="tel" inputMode="tel" placeholder="+998901234567" autoComplete="off" {...field} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )} />
                 </div>
@@ -257,7 +267,8 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
 }
 
 export default function SellPage() {
-  const [products, setProducts] = useState<ProductResponse[]>([]);
+  const [products, setProducts] = useState<ProductResponse[] | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -266,16 +277,22 @@ export default function SellPage() {
 
   // Nothing sold out belongs on a till screen — you cannot sell it, and it only
   // pushes the sellable products further down the grid. The server has no
-  // "in stock only" filter, so the fetched page is narrowed here.
-  const sellable = products.filter(p => p.stockQuantity > 0);
-  const allSoldOut = products.length > 0 && sellable.length === 0;
+  // "in stock only" filter, so every page is fetched and narrowed here: filtering
+  // one 60-row page instead used to hide product #61 from the till entirely, and
+  // could claim the whole shop was sold out when only the first 60 rows were.
+  const sellable = (products ?? []).filter(p => p.stockQuantity > 0);
+  const allSoldOut = !!products && products.length > 0 && sellable.length === 0;
 
   const load = useCallback(async (q: string) => {
     setLoading(true);
     try {
-      const res = await productsApi.getAll(q || undefined, 0, 60);
-      setProducts(extractContent(res));
+      const res = await fetchAllPages<ProductResponse>(
+        (page, size) => productsApi.getAll(q || undefined, page, size),
+      );
+      setProducts(res.items);
+      setTruncated(res.truncated);
     } catch {
+      setProducts(null);
       toast.error('Mahsulotlar yuklanmadi');
     } finally {
       setLoading(false);
@@ -327,13 +344,28 @@ export default function SellPage() {
           />
         </div>
 
+        {truncated && !loading && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Mahsulot juda ko'p — barchasi ko'rsatilmadi. Qidiruvdan foydalaning.
+          </p>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 items-stretch">
           {loading ? (
             Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[140px] rounded-2xl" />)
+          ) : !products ? (
+            <div className="col-span-full flex flex-col items-center py-12 text-muted-foreground">
+              <p className="text-sm mb-3">Mahsulotlar yuklanmadi</p>
+              <Button variant="outline" className="press" onClick={() => load(search)}>Qayta urinish</Button>
+            </div>
           ) : allSoldOut ? (
             <div className="col-span-full flex flex-col items-center py-12 text-muted-foreground">
               <Package className="h-10 w-10 mb-3 opacity-50" />
-              <p className="text-sm">Sotuvga tayyor mahsulot yo'q — barchasi tugagan</p>
+              <p className="text-sm">
+                {search
+                  ? "Bu qidiruv bo'yicha sotuvga tayyor mahsulot yo'q"
+                  : "Sotuvga tayyor mahsulot yo'q — barchasi tugagan"}
+              </p>
             </div>
           ) : sellable.length === 0 ? (
             <p className="col-span-full text-center py-10 text-sm text-muted-foreground">Mahsulot topilmadi</p>

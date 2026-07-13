@@ -77,7 +77,12 @@ async function request<T>(
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    if (data?.message || data?.error) throw new Error(data.message || data.error);
+    // Only `message` — the backend writes it in Uzbek. `error` is Spring's
+    // generic English reason ("Unauthorized", "Forbidden"), and accepting it
+    // shadowed every message below: a mistyped PIN showed the cashier a raw
+    // "Unauthorized" instead of "PIN noto'g'ri".
+    const serverMessage = typeof data?.message === 'string' ? data.message.trim() : '';
+    if (serverMessage) throw new Error(serverMessage);
     if (response.status === 401 && isLoginRequest) throw new Error("PIN noto'g'ri");
     if (response.status === 429) throw new Error("Juda ko'p urinish. Bir necha daqiqa kutib, qaytadan urinib ko'ring.");
     if (response.status === 403) throw new Error("Bu amal uchun huquqingiz yo'q.");
@@ -111,6 +116,45 @@ export function extractPage(data: PagedResponse<unknown>) {
     number: data.page?.number ?? 0,
     size: data.page?.size ?? 20,
   };
+}
+
+/**
+ * Reads every page of a paged endpoint — for the screens that must count or
+ * search across the whole collection (the till grid, Ombor, Qarzlar), because
+ * the server offers no "in stock only", no status filter and no name search.
+ *
+ * `truncated` is true when the collection is bigger than the ceiling below, so
+ * a caller can say so out loud instead of quietly presenting a partial list as
+ * the complete one.
+ */
+const FETCH_ALL_PAGE_SIZE = 100;
+const FETCH_ALL_MAX_PAGES = 20; // 2000 rows — beyond that, the UI must paginate.
+
+export interface FetchAllResult<T> { items: T[]; truncated: boolean }
+
+export async function fetchAllPages<T extends { id: number }>(
+  fetchPage: (page: number, size: number) => Promise<PagedResponse<T>>,
+): Promise<FetchAllResult<T>> {
+  const first = await fetchPage(0, FETCH_ALL_PAGE_SIZE);
+
+  // Keyed by id, not appended: rows created or deleted by another cashier while
+  // we page shift every later offset, which otherwise returns a row twice (a
+  // duplicate React key, double-counted in every total) or skips one entirely.
+  const byId = new Map<number, T>();
+  for (const item of extractContent(first)) byId.set(item.id, item);
+
+  const { totalPages } = extractPage(first);
+  const lastPage = Math.min(totalPages, FETCH_ALL_MAX_PAGES);
+  if (lastPage > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: lastPage - 1 }, (_, i) => fetchPage(i + 1, FETCH_ALL_PAGE_SIZE)),
+    );
+    for (const page of rest) {
+      for (const item of extractContent(page)) byId.set(item.id, item);
+    }
+  }
+
+  return { items: [...byId.values()], truncated: totalPages > lastPage };
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────

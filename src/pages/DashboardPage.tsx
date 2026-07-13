@@ -222,13 +222,16 @@ export default function DashboardPage() {
                     <span className="font-semibold">{inventory ? `${inventory.totalProducts} ta` : '—'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Kam qolgan</span>
+                    {/* The server's low-stock cutoff counts sold-out products too,
+                        so this is "kam qolgan yoki tugagan" — the Ombor page,
+                        which separates the two, is one tap away. */}
+                    <span className="text-muted-foreground">Kam qolgan / tugagan</span>
                     <span className={cn('font-semibold', (inventory?.lowStockCount ?? 0) > 0 && 'text-destructive')}>
                       {inventory ? inventory.lowStockCount : '—'}
                     </span>
                   </div>
-                  <Link to="/products" className="inline-flex items-center min-h-11 text-xs text-primary font-medium press">
-                    Mahsulotlarni ko'rish →
+                  <Link to="/stock" className="inline-flex items-center min-h-11 text-xs text-primary font-medium press">
+                    Omborni ko'rish →
                   </Link>
                 </>
               )}
@@ -273,6 +276,10 @@ export default function DashboardPage() {
             <CardContent className="space-y-2">
               {loading ? (
                 <Skeleton className="h-20 w-full" />
+              ) : !today ? (
+                // "Bugun sotuv bo'lmagan" is a claim about the shop's day. When
+                // the request failed we know nothing about the shop's day.
+                <p className="text-sm text-muted-foreground py-2">Ma'lumot yuklanmadi</p>
               ) : topProducts.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-2">Bugun sotuv bo'lmagan</p>
               ) : (

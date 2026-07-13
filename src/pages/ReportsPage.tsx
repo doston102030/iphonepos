@@ -171,10 +171,14 @@ function RangeTab() {
       document.body.appendChild(a);
       a.click();
       a.remove();
+      // Revoking in a `finally` tore the URL down in the same microtask as the
+      // click; Safari and Firefox then cancel the download and the user gets no
+      // file and no error. Let the browser start reading it first.
+      const created = objectUrl;
+      setTimeout(() => URL.revokeObjectURL(created), 60_000);
     } catch {
-      toast.error('CSV yuklab olishda xato');
-    } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
+      toast.error('CSV yuklab olishda xato');
     }
   }
 
@@ -221,8 +225,11 @@ function DailyBreakdownTab() {
     setLoading(true);
     try {
       const res = await reportsApi.rangeDaily(from, to);
-      setData(res);
-    } catch { toast.error('Hisobot yuklanmadi'); }
+      // Nothing validates the payload at runtime; a 204 or a changed shape would
+      // make `.map` below throw, and the only error boundary sits above the whole
+      // app — one bad report would blank the entire UI, nav and all.
+      setData(Array.isArray(res) ? res : []);
+    } catch { setData([]); toast.error('Hisobot yuklanmadi'); }
     finally { setLoading(false); }
   }
 
@@ -316,8 +323,8 @@ function ByUserTab() {
     setLoading(true);
     try {
       const res = await reportsApi.byUser(from, to);
-      setData(res);
-    } catch { toast.error('Hisobot yuklanmadi'); }
+      setData(Array.isArray(res) ? res : []);
+    } catch { setData([]); toast.error('Hisobot yuklanmadi'); }
     finally { setLoading(false); }
   }
 

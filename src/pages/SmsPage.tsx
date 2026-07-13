@@ -104,7 +104,9 @@ function SendSmsDialog({ open, onOpenChange, onSaved }: {
 }
 
 export default function SmsPage() {
-  const [campaigns, setCampaigns] = useState<SmsCampaignResponse[]>([]);
+  // null = the fetch failed. [] = there really are no campaigns. Rendering
+  // "Kampaniya yo'q" for both would state something we do not know.
+  const [campaigns, setCampaigns] = useState<SmsCampaignResponse[] | null>([]);
   const [balance, setBalance] = useState<SmsBalanceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [sendOpen, setSendOpen] = useState(false);
@@ -122,7 +124,7 @@ export default function SmsPage() {
     ]);
 
     if (c.status === 'fulfilled') setCampaigns(extractContent(c.value));
-    else toast.error('Kampaniyalar yuklanmadi');
+    else { setCampaigns(null); toast.error('Kampaniyalar yuklanmadi'); }
 
     setBalance(b.status === 'fulfilled' ? b.value : null);
     setLoading(false);
@@ -184,6 +186,11 @@ export default function SmsPage() {
                   Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="p-4"><Skeleton className="h-14 w-full" /></div>
                   ))
+                ) : !campaigns ? (
+                  <div className="flex flex-col items-center py-8 gap-3">
+                    <p className="text-sm text-muted-foreground">Kampaniyalar yuklanmadi</p>
+                    <Button variant="outline" size="sm" className="press" onClick={loadData}>Qayta urinish</Button>
+                  </div>
                 ) : campaigns.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground text-sm">Kampaniya yo'q</p>
                 ) : campaigns.map(c => (
@@ -229,6 +236,15 @@ export default function SmsPage() {
                         ))}
                       </TableRow>
                     ))
+                  ) : !campaigns ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                        Kampaniyalar yuklanmadi —{' '}
+                        <button type="button" className="text-primary font-medium underline" onClick={loadData}>
+                          qayta urinish
+                        </button>
+                      </TableCell>
+                    </TableRow>
                   ) : campaigns.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">

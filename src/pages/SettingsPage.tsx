@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Save, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,14 +32,14 @@ export default function SettingsPage() {
 
   // darkMode is not local state: it *is* the live theme, so the switch, the
   // header toggle and the saved value can never drift apart.
+  //
+  // The server's darkMode is deliberately NOT applied on mount. It used to be —
+  // by *toggling* against the live theme — so a cashier who switched to dark
+  // from the menu and then opened Sozlamalar was snapped straight back to light,
+  // their choice silently undone. The live theme (persisted in localStorage) is
+  // what the user last chose; "Saqlash" is what writes it to the server.
   const { theme, toggleTheme } = useTheme();
   const darkMode = theme === 'dark';
-
-  // Read by the one-shot loader below without making it re-run on every toggle.
-  const themeRef = useRef({ darkMode, toggleTheme });
-  useEffect(() => {
-    themeRef.current = { darkMode, toggleTheme };
-  });
 
   // If the GET fails, the form must NOT fall back to its defaults and stay
   // editable: it would show "O'zbekcha" to a Russian-language user, and the
@@ -50,11 +50,7 @@ export default function SettingsPage() {
     setLoading(true);
     setLoadFailed(false);
     settingsApi.get()
-      .then(data => {
-        setLanguage(toLanguage(data.language));
-        // Apply the saved preference to the live theme.
-        if (data.darkMode !== themeRef.current.darkMode) themeRef.current.toggleTheme();
-      })
+      .then(data => setLanguage(toLanguage(data.language)))
       .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, []);

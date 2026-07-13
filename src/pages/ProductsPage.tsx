@@ -588,7 +588,11 @@ export default function ProductsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="text-base font-bold tracking-tight text-foreground leading-snug">
                         <span className="break-words">{p.name}</span>
-                        {p.stockQuantity <= LOW_STOCK_THRESHOLD && (
+                        {/* Sold out is not "low" — it used to wear the same "Kam"
+                            badge as a product with 4 left on the shelf. */}
+                        {p.stockQuantity <= 0 ? (
+                          <Badge variant="destructive" className="ml-2 text-[10px] align-middle px-1.5 py-0 h-4">Tugagan</Badge>
+                        ) : p.stockQuantity <= LOW_STOCK_THRESHOLD && (
                           <Badge variant="destructive" className="ml-2 text-[10px] align-middle px-1.5 py-0 h-4">Kam</Badge>
                         )}
                       </div>
@@ -675,7 +679,9 @@ export default function ProductsPage() {
                       <TableRow key={p.id}>
                         <TableCell className="whitespace-nowrap font-medium">
                           {p.name}
-                          {p.stockQuantity <= LOW_STOCK_THRESHOLD && (
+                          {p.stockQuantity <= 0 ? (
+                            <Badge variant="destructive" className="ml-2 text-[10px]">Tugagan</Badge>
+                          ) : p.stockQuantity <= LOW_STOCK_THRESHOLD && (
                             <Badge variant="destructive" className="ml-2 text-[10px]">Kam</Badge>
                           )}
                         </TableCell>

@@ -42,6 +42,11 @@ export function BarcodeScannerDialog({
     let isMounted = true;
     let scanner: Html5Qrcode | null = null;
     let started = false;
+    // Cleanup awaits this. Closing the dialog while start() was still negotiating
+    // the stream used to leave `started === false`, so stop() was never called:
+    // the camera stayed live — indicator on, unusable by other apps — and a
+    // second Html5Qrcode was constructed on top of the orphan on the next open.
+    let startup: Promise<void> = Promise.resolve();
     setError(null);
 
     const onSuccess = (decodedText: string) => {
@@ -52,11 +57,11 @@ export function BarcodeScannerDialog({
     const scanConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
 
     // Wait a bit for the overlay animation and DOM to settle.
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       if (!isMounted || !containerRef.current) return;
-
+      startup = (async () => {
       try {
-        scanner = new Html5Qrcode(containerRef.current.id, {
+        scanner = new Html5Qrcode(containerRef.current!.id, {
           verbose: false,
           formatsToSupport: SUPPORTED_FORMATS,
         });
@@ -81,20 +86,34 @@ export function BarcodeScannerDialog({
             }
           }
         }
-        if (isMounted) started = true;
+        // Set even when the dialog has already closed — the stream is live and
+        // somebody has to stop it.
+        started = true;
       } catch {
-        if (isMounted) setError("Kameraga ruxsat berilmadi yoki qurilma topilmadi. Shtrix-kodni qo'lda kiriting.");
+        if (isMounted) {
+          setError(
+            typeof navigator !== 'undefined' && !navigator.mediaDevices
+              // Chrome/Safari hide the camera API entirely on a non-HTTPS origin,
+              // which is exactly how a shop tablet on a LAN IP is usually opened.
+              ? "Kamera faqat HTTPS orqali ishlaydi. Shtrix-kodni qo'lda kiriting."
+              : "Kameraga ruxsat berilmadi yoki qurilma topilmadi. Shtrix-kodni qo'lda kiriting."
+          );
+        }
       }
+      })();
     }, 150);
 
     return () => {
       isMounted = false;
       clearTimeout(timer);
-      if (scanner && started) {
-        scanner.stop().then(() => scanner?.clear()).catch(() => {
-          try { scanner?.clear(); } catch { /* already torn down */ }
-        });
-      }
+      // Wait for a start that may still be in flight before tearing it down.
+      startup.finally(() => {
+        if (scanner && started) {
+          scanner.stop().then(() => scanner?.clear()).catch(() => {
+            try { scanner?.clear(); } catch { /* already torn down */ }
+          });
+        }
+      });
     };
   }, [open]);
 

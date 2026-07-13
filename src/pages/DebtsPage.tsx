@@ -25,9 +25,8 @@ import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { NumericKeypad } from '@/components/common/NumericKeypad';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
-  debtsApi, remainingAmount,
+  debtsApi, remainingAmount, fetchAllPages,
   type DebtRequest, type DebtResponse, type DebtPaymentResponse, type DebtStatus,
-  extractContent, extractPage
 } from '@/lib/api';
 import { cn, formatCurrency, formatDateTime, getDebtStatusLabel } from '@/lib/utils';
 
@@ -299,26 +298,10 @@ const STATUS_TABS: { value: DebtStatus; label: string }[] = [
 
 const PAGE_SIZE = 20;
 
-/**
- * GET /api/debts takes only page & size — it cannot filter by status and cannot
- * search by name. So the tabs and the search box are only honest if every debt
- * is in memory: paging the server and then filtering the 20 rows that came back
- * made the "To'lanmagan" tab report "Qarz topilmadi" while unpaid debts sat on
- * page 2, and made a customer on page 3 unfindable by name. Filtering and
- * paging therefore both happen here, over the full list.
- */
-async function fetchAllDebts(): Promise<DebtResponse[]> {
-  const first = await debtsApi.getAll(0, 100);
-  const all = extractContent(first);
-  const { totalPages } = extractPage(first);
-  for (let p = 1; p < totalPages; p++) {
-    all.push(...extractContent(await debtsApi.getAll(p, 100)));
-  }
-  return all;
-}
-
 export default function DebtsPage() {
-  const [debts, setDebts] = useState<DebtResponse[]>([]);
+  // null means "we do not know" — a failed load must not render an empty debt
+  // book and a confident "Umumiy qarz: 0 so'm".
+  const [debts, setDebts] = useState<DebtResponse[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [editDebt, setEditDebt] = useState<DebtResponse | null>(null);
@@ -330,25 +313,37 @@ export default function DebtsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<DebtStatus>('UNPAID');
   const [search, setSearch] = useState('');
+  const [truncated, setTruncated] = useState(false);
   const isMobile = useIsMobile();
 
+  // GET /api/debts takes only page & size — it can neither filter by status nor
+  // search by name. So the tabs and the search box are only honest if every debt
+  // is in memory: filtering the 20 rows of one server page made the
+  // "To'lanmagan" tab report "Qarz topilmadi" while unpaid debts sat on page 2.
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setDebts(await fetchAllDebts());
-    } catch { toast.error('Qarzlar yuklanmadi'); }
-    finally { setLoading(false); }
+      const res = await fetchAllPages(debtsApi.getAll);
+      setDebts(res.items);
+      setTruncated(res.truncated);
+    } catch {
+      setDebts(null);
+      toast.error('Qarzlar yuklanmadi');
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   // Every debt is loaded, so this really is the shop's outstanding total — it
   // used to be the subtotal of whichever page you were looking at.
-  const totalDebt = useMemo(() => debts.reduce((s, d) => s + remainingAmount(d), 0), [debts]);
+  const totalDebt = useMemo(
+    () => (debts ?? []).reduce((s, d) => s + remainingAmount(d), 0),
+    [debts],
+  );
 
   const filteredDebts = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return debts.filter(d => {
+    return (debts ?? []).filter(d => {
       if (d.status !== statusFilter) return false;
       if (!q) return true;
       return d.customerName.toLowerCase().includes(q) || (d.phone ?? '').includes(q);
@@ -395,11 +390,26 @@ export default function DebtsPage() {
           <div className="h-10 w-10 rounded-full bg-destructive text-white flex items-center justify-center shrink-0">
             <DollarSign className="h-5 w-5" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-muted-foreground">Umumiy qarz</p>
-            <p className="text-lg font-bold text-destructive truncate">{formatCurrency(totalDebt)}</p>
+            {/* Never a zero we did not measure: "0 so'm" here would tell the owner
+                that nobody owes them anything. */}
+            <p className="text-lg font-bold text-destructive truncate">
+              {loading ? '…' : debts ? formatCurrency(totalDebt) : '—'}
+            </p>
           </div>
+          {!loading && !debts && (
+            <Button variant="outline" size="sm" className="shrink-0 press" onClick={load}>
+              Qayta urinish
+            </Button>
+          )}
         </div>
+
+        {truncated && !loading && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Qarzlar juda ko'p — barchasi yuklanmadi. Qidiruvdan foydalaning.
+          </p>
+        )}
 
         <div className="flex gap-1 p-1 rounded-2xl bg-muted mb-4">
           {STATUS_TABS.map(tab => (
@@ -434,6 +444,8 @@ export default function DebtsPage() {
               Array.from({ length: 5 }).map((_, i) => (
                 <Card key={i} className="shadow-sm"><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
               ))
+            ) : !debts ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">Qarzlar yuklanmadi</p>
             ) : pagedDebts.length === 0 ? (
               <p className="text-center py-8 text-muted-foreground text-sm">Qarz topilmadi</p>
             ) : pagedDebts.map(d => {
@@ -531,6 +543,12 @@ export default function DebtsPage() {
                           ))}
                         </TableRow>
                       ))
+                    ) : !debts ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-sm">
+                          Qarzlar yuklanmadi
+                        </TableCell>
+                      </TableRow>
                     ) : pagedDebts.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-sm">

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, Delete, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Logo } from '@/components/common/Logo';
@@ -19,6 +19,11 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ProtectedRoute stashes where the user was headed before it bounced them
+  // here; going anywhere else would silently drop a deep link.
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/';
 
   const submit = useCallback(async (value: string) => {
     setError('');
@@ -27,19 +32,16 @@ export default function LoginPage() {
       const res = await authApi.login({ pin: value });
       login(res);
       toast.success(`Xush kelibsiz, ${res.fullName}!`);
-      navigate('/');
+      navigate(from, { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')) {
-        setError("Server bilan bog'lanib bo'lmadi. Internet aloqasini tekshiring.");
-      } else {
-        setError(msg || "PIN noto'g'ri");
-      }
+      // request() already turns a dead network into an Uzbek sentence, so
+      // whatever arrives here is safe to show as-is.
+      setError(err instanceof Error && err.message ? err.message : "PIN noto'g'ri");
       setPin('');
     } finally {
       setLoading(false);
     }
-  }, [login, navigate]);
+  }, [login, navigate, from]);
 
   // Fire once the last digit lands. The ref guards against a second submit for
   // the same PIN if this effect re-runs before `loading` has flipped.

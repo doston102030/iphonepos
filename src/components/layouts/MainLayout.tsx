@@ -14,7 +14,7 @@ import { cn, getRoleLabel } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useCart } from '@/contexts/CartContext';
-import { debtsApi, extractContent, type Role } from '@/lib/api';
+import { debtsApi, fetchAllPages, type Role } from '@/lib/api';
 
 interface NavItem {
   label: string;
@@ -84,6 +84,16 @@ function ThemeToggle({ className }: { className?: string }) {
   );
 }
 
+/**
+ * A plain `startsWith` lit up "Ombor" (/stock) while you were on "Ombor
+ * harakatlari" (/stock-movements) — one path is a prefix of the other. Only an
+ * exact match, or a real child segment, counts as active.
+ */
+function isPathActive(pathname: string, path: string): boolean {
+  if (path === '/') return pathname === '/';
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const { user } = useAuth();
@@ -94,9 +104,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex-1 px-3 py-2 space-y-0.5">
       {visibleItems.map(item => {
-        const isActive = item.path === '/'
-          ? location.pathname === '/'
-          : location.pathname.startsWith(item.path);
+        const isActive = isPathActive(location.pathname, item.path);
         return (
           <Link
             key={item.path}
@@ -180,9 +188,7 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
       <div className="flex items-stretch">
         {bottomTabs.map(tab => {
           const Icon = tab.icon;
-          const isActive = tab.path === '/'
-            ? location.pathname === '/'
-            : location.pathname.startsWith(tab.path);
+          const isActive = isPathActive(location.pathname, tab.path);
           const badge = badgeFor(tab.path);
           return (
             <Link
@@ -255,9 +261,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
         {/* Menu Grid */}
         <div className="grid grid-cols-2 gap-3">
           {moreItems.map(item => {
-            const isActive = item.path === '/'
-              ? location.pathname === '/'
-              : location.pathname.startsWith(item.path);
+            const isActive = isPathActive(location.pathname, item.path);
             return (
               <button
                 key={item.path}
@@ -295,16 +299,36 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
+// Every page renders its own <MainLayout>, so this effect re-fires on every
+// navigation. Counting the debt book each time would be a burst of requests per
+// tap, so the answer is cached for a minute.
+let debtCountCache: { at: number; count: number } | null = null;
+const DEBT_COUNT_TTL_MS = 60_000;
+
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const [unpaidDebtsCount, setUnpaidDebtsCount] = useState(0);
+  const [unpaidDebtsCount, setUnpaidDebtsCount] = useState(debtCountCache?.count ?? 0);
   const { user } = useAuth();
   const { totalCount } = useCart();
 
   useEffect(() => {
-    debtsApi.getAll(0, 100)
-      .then(res => setUnpaidDebtsCount(extractContent(res).filter(d => d.status !== 'PAID').length))
+    if (debtCountCache && Date.now() - debtCountCache.at < DEBT_COUNT_TTL_MS) {
+      setUnpaidDebtsCount(debtCountCache.count);
+      return;
+    }
+    let cancelled = false;
+
+    // Every page, not the first 100 rows: the badge sits on the tab that opens
+    // the debt list, and it used to disagree with the list it points at.
+    fetchAllPages(debtsApi.getAll)
+      .then(({ items }) => {
+        const count = items.filter(d => d.status !== 'PAID').length;
+        debtCountCache = { at: Date.now(), count };
+        if (!cancelled) setUnpaidDebtsCount(count);
+      })
       .catch(() => null);
+
+    return () => { cancelled = true; };
   }, []);
 
   return (

@@ -14,6 +14,20 @@
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="inPOS — do'kon uchun savdo, ombor, qarz va hisobot tizimi" />
     <title>inPOS</title>
+    <script>
+      // The dark class is otherwise added by a React effect, i.e. after the first
+      // paint: a dark-mode user got a white flash on every load — and on every
+      // 401, which reloads the page.
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var dark = saved
+            ? saved === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) { /* private mode: fall back to the light theme */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

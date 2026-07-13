@@ -73,8 +73,15 @@ export default function ProfitPage() {
         reportsApi.range(from, to),
         reportsApi.rangeDaily(from, to),
       ]);
-      setSummary(s); setDaily(d);
+      setSummary(s);
+      // The endpoint is typed as an array, but nothing validates the payload at
+      // runtime — a 204 or a changed shape would crash the render below, and the
+      // only error boundary sits above the whole app.
+      setDaily(Array.isArray(d) ? d : []);
     } catch {
+      // Zeros here would read as "you earned nothing", not "the request failed".
+      setSummary(null);
+      setDaily([]);
       toast.error('Foyda hisoboti yuklanmadi');
     } finally { setLoading(false); }
   }, [period, customFrom, customTo]);
@@ -127,17 +134,24 @@ export default function ProfitPage() {
               <Card key={i} className="shadow-card rounded-2xl"><CardContent className="p-4"><Skeleton className="h-14 w-full" /></CardContent></Card>
             ))}
           </div>
+        ) : !summary ? (
+          <div className="mb-6 flex flex-col items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 py-8 text-center">
+            <p className="text-sm text-destructive font-medium px-4">
+              Foyda hisoboti yuklanmadi
+            </p>
+            <Button variant="outline" size="sm" className="press" onClick={load}>Qayta urinish</Button>
+          </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-            <KpiCard title="Jami savdo" value={formatCurrency(summary?.totalRevenue ?? 0)} icon={<Wallet className="h-3.5 w-3.5" />} />
+            <KpiCard title="Jami savdo" value={formatCurrency(summary.totalRevenue)} icon={<Wallet className="h-3.5 w-3.5" />} />
             <KpiCard title="Tannarx" value={formatCurrency(cost)} icon={<TrendingDown className="h-3.5 w-3.5" />} />
             <KpiCard
-              title="Sof foyda" value={formatCurrency(summary?.totalProfit ?? 0)}
+              title="Sof foyda" value={formatCurrency(summary.totalProfit)}
               icon={<TrendingUp className="h-3.5 w-3.5" />}
-              tone={(summary?.totalProfit ?? 0) >= 0 ? 'success' : 'destructive'}
+              tone={summary.totalProfit >= 0 ? 'success' : 'destructive'}
             />
             <KpiCard
-              title="Marja" value={`${margin}%`} sub={`${summary?.totalOrders ?? 0} ta buyurtma`}
+              title="Marja" value={`${margin}%`} sub={`${summary.totalOrders} ta buyurtma`}
               icon={<Percent className="h-3.5 w-3.5" />}
               tone={margin >= 0 ? 'success' : 'destructive'}
             />

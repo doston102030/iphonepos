@@ -30,7 +30,7 @@ function typeBadgeVariant(type: string): 'default' | 'secondary' | 'destructive'
 }
 
 export default function StockMovementsPage() {
-  const [movements, setMovements] = useState<StockMovementResponse[]>([]);
+  const [movements, setMovements] = useState<StockMovementResponse[] | null>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -58,7 +58,11 @@ export default function StockMovementsPage() {
       const pg = extractPage(res);
       setTotalPages(pg.totalPages);
       setTotalElements(pg.totalElements);
-    } catch { toast.error('Ombor harakatlari yuklanmadi'); }
+    } catch {
+      // null, not []: "Harakat topilmadi" claims the warehouse had no movements.
+      setMovements(null);
+      toast.error('Ombor harakatlari yuklanmadi');
+    }
     finally { setLoading(false); }
   }, [appliedFilters, page]);
 
@@ -137,6 +141,11 @@ export default function StockMovementsPage() {
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="p-4"><Skeleton className="h-14 w-full" /></div>
                   ))
+                ) : !movements ? (
+                  <div className="flex flex-col items-center py-8 gap-3">
+                    <p className="text-sm text-muted-foreground">Harakatlar yuklanmadi</p>
+                    <Button variant="outline" size="sm" className="press" onClick={load}>Qayta urinish</Button>
+                  </div>
                 ) : movements.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground text-sm">Harakat topilmadi</p>
                 ) : movements.map(m => (
@@ -187,6 +196,15 @@ export default function StockMovementsPage() {
                         ))}
                       </TableRow>
                     ))
+                  ) : !movements ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
+                        Harakatlar yuklanmadi —{' '}
+                        <button type="button" className="text-primary font-medium underline" onClick={load}>
+                          qayta urinish
+                        </button>
+                      </TableCell>
+                    </TableRow>
                   ) : movements.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">

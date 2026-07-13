@@ -3,10 +3,11 @@ import { Search, Package, PackageX, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import {
-  productsApi, extractContent, extractPage,
+  productsApi, fetchAllPages,
   LOW_STOCK_THRESHOLD, type ProductResponse,
 } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -26,19 +27,6 @@ function groupOf(p: ProductResponse): StockGroup {
   return 'IN_STOCK';
 }
 
-/**
- * Every product, not one server page: the three groups are counted here, and a
- * count that only saw 30 of 200 products would be a lie on the tab itself.
- */
-async function fetchAllProducts(): Promise<ProductResponse[]> {
-  const first = await productsApi.getAll(undefined, 0, 100);
-  const all = extractContent(first);
-  const { totalPages } = extractPage(first);
-  for (let p = 1; p < totalPages; p++) {
-    all.push(...extractContent(await productsApi.getAll(undefined, p, 100)));
-  }
-  return all;
-}
 
 function StockCard({ product }: { product: ProductResponse }) {
   const group = groupOf(product);
@@ -77,14 +65,21 @@ function StockCard({ product }: { product: ProductResponse }) {
 
 export default function StockPage() {
   const [products, setProducts] = useState<ProductResponse[] | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<StockGroup>('IN_STOCK');
   const [search, setSearch] = useState('');
 
+  // Every product, not one server page: the three counts sit on the tabs, and a
+  // count that had only seen 100 of 300 products would be a lie on the tab.
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setProducts(await fetchAllProducts());
+      const res = await fetchAllPages<ProductResponse>(
+        (page, size) => productsApi.getAll(undefined, page, size),
+      );
+      setProducts(res.items);
+      setTruncated(res.truncated);
     } catch {
       setProducts(null);
       toast.error('Ombor yuklanmadi');
@@ -127,8 +122,10 @@ export default function StockPage() {
               )}
             >
               <span className="block truncate">{tab.label}</span>
+              {/* "—", not 0, when the fetch failed: a zero here is a claim about
+                  the warehouse, and we do not know anything about it. */}
               <span className="block text-[11px] font-bold opacity-70 tabular-nums">
-                {loading ? '—' : counts[tab.value]}
+                {loading || !products ? '—' : counts[tab.value]}
               </span>
             </button>
           ))}
@@ -144,11 +141,20 @@ export default function StockPage() {
           />
         </div>
 
+        {truncated && !loading && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Mahsulot juda ko'p — barchasi ko'rsatilmadi. Qidiruvdan foydalaning.
+          </p>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {loading ? (
             Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[76px] rounded-2xl" />)
           ) : !products ? (
-            <p className="col-span-full text-center py-10 text-sm text-muted-foreground">Yuklanmadi</p>
+            <div className="col-span-full flex flex-col items-center py-12 text-muted-foreground">
+              <p className="text-sm mb-3">Ombor yuklanmadi</p>
+              <Button variant="outline" className="press" onClick={load}>Qayta urinish</Button>
+            </div>
           ) : visible.length === 0 ? (
             <p className="col-span-full text-center py-10 text-sm text-muted-foreground">Mahsulot yo'q</p>
           ) : visible.map(p => <StockCard key={p.id} product={p} />)}
