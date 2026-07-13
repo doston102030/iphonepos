@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, ShoppingCart, Minus, Plus, Package, Trash2 } from 'lucide-react';
+import { Search, ShoppingCart, Minus, Plus, Package, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ import {
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useCart, type CartItem } from '@/contexts/CartContext';
 import {
   productsApi, ordersApi, fetchAllPages, newIdempotencyKey, type ProductResponse,
@@ -45,7 +46,7 @@ const checkoutSchema = z.object({
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 
-function ProductGridCard({ product }: { product: ProductResponse }) {
+function ProductGridCard({ product, onEdit }: { product: ProductResponse; onEdit: () => void }) {
   const { quantityOf, addItem, decrementItem } = useCart();
   const qty = quantityOf(product.id);
   // Sold-out products never reach this grid, so the only ceiling left to hold
@@ -75,6 +76,14 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
           </button>
           <button
             type="button"
+            aria-label="Qo'lda kiritish"
+            onClick={onEdit}
+            className="flex-1 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center press"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             aria-label="Qo'shish"
             disabled={atStockLimit}
             onClick={() => addItem(product)}
@@ -89,31 +98,166 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
 }
 
 /**
- * One basket line. The quantity itself is typeable, and for measured units
- * (kg, litr, …) there is a second field that takes the TARGET SUM — the shop
- * counter workflow where the customer asks for "2000 so'mlik" of something.
- * The server only accepts whole quantities, so the sum is rounded to the
- * nearest whole kg/litr and the line total always shows the real charge.
+ * The counter modal: type the QUANTITY by hand, or — for measured units — type
+ * the target SUM ("2000 so'mlik bering") and the quantity is worked out. The
+ * two fields drive each other. Quantities are whole numbers because the
+ * server's OrderItemRequest.quantity is int32, so the sum rounds to the
+ * nearest whole kg/litr and "Jami" always shows the real charge. Removal from
+ * the basket lives here too — the row's trash icon became this pencil.
  */
-function CartItemRow({ item }: { item: CartItem }) {
-  const { addItem, decrementItem, removeItem, setItemQuantity } = useCart();
-  const { product, quantity } = item;
+function QuantityModal({ product, open, onOpenChange }: {
+  product: ProductResponse | null; open: boolean; onOpenChange: (v: boolean) => void;
+}) {
+  const { quantityOf, addItem, setItemQuantity, removeItem } = useCart();
+  const [qtyDraft, setQtyDraft] = useState('1');
+  const [sumDraft, setSumDraft] = useState('');
+  const inCart = product ? quantityOf(product.id) > 0 : false;
+
+  useEffect(() => {
+    if (open && product) {
+      const q = quantityOf(product.id) || 1;
+      setQtyDraft(String(q));
+      setSumDraft(String(q * product.price));
+    }
+  }, [open, product, quantityOf]);
+
+  if (!product) return null;
   const unit = getProductUnit(product.id);
   const measured = MEASURED_UNITS.has(unit);
+
+  const qtyNum = Math.floor(Number(qtyDraft));
+  const validQty = qtyDraft !== '' && Number.isFinite(qtyNum) && qtyNum >= 1;
+  // What will actually be charged after the stock ceiling and rounding.
+  const finalQty = validQty ? Math.min(qtyNum, product.stockQuantity) : 0;
+  const overStock = validQty && qtyNum > product.stockQuantity;
+
+  function handleQtyChange(v: string) {
+    setQtyDraft(v);
+    const n = Math.floor(Number(v));
+    if (v !== '' && Number.isFinite(n) && n >= 0) setSumDraft(String(n * product!.price));
+  }
+  function handleSumChange(v: string) {
+    setSumDraft(v);
+    const n = Number(v);
+    if (v !== '' && Number.isFinite(n) && product!.price > 0) {
+      setQtyDraft(String(Math.max(1, Math.round(n / product!.price))));
+    }
+  }
+  function handleSave() {
+    if (!validQty) return;
+    // addItem first covers the grid case (row not in the basket yet);
+    // setItemQuantity then lands the typed amount, clamped to stock.
+    if (!inCart) addItem(product!);
+    setItemQuantity(product!.id, qtyNum);
+    onOpenChange(false);
+  }
+  function handleRemove() {
+    removeItem(product!.id);
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[360px] rounded-3xl p-5">
+        <div className="pr-8">
+          <DialogTitle className="text-lg font-bold leading-tight break-words">{product.name}</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            {formatCurrency(product.price)} / {unit} · Omborda: {product.stockQuantity} {unit}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-1.5">Miqdor ({unit})</p>
+            <div className="relative">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                aria-label="Miqdor"
+                placeholder="1"
+                className="w-full h-12 rounded-2xl bg-muted/50 border border-border/50 px-4 pr-16 text-lg font-bold outline-none focus:border-primary"
+                value={qtyDraft}
+                onFocus={e => e.target.select()}
+                onChange={e => handleQtyChange(e.target.value)}
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">{unit}</span>
+            </div>
+          </div>
+
+          {measured && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Yoki summa bilan</p>
+              <div className="relative">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  aria-label="Summa bilan"
+                  placeholder="0"
+                  className="w-full h-12 rounded-2xl bg-muted/50 border border-border/50 px-4 pr-16 text-lg font-bold outline-none focus:border-primary"
+                  value={sumDraft}
+                  onFocus={e => e.target.select()}
+                  onChange={e => handleSumChange(e.target.value)}
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">so'm</span>
+              </div>
+            </div>
+          )}
+
+          {overStock && (
+            <p className="text-xs font-medium text-destructive">
+              Omborda faqat {product.stockQuantity} {unit} bor — shunga tushiriladi.
+            </p>
+          )}
+          <div className="flex items-center justify-between rounded-2xl bg-success/10 px-4 py-3">
+            <span className="text-sm font-medium text-success">Jami</span>
+            <span className="text-base font-bold text-success">
+              {finalQty > 0 ? `${finalQty} ${unit} · ${formatCurrency(finalQty * product.price)}` : '—'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          {inCart && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="h-12 px-4 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center shrink-0 press"
+              aria-label="Savatchadan o'chirish"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+          )}
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={!validQty}
+            className="flex-1 h-12 rounded-2xl text-base font-bold"
+          >
+            Tayyor
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * One basket line. The quantity is typeable in place; the pencil opens the
+ * QuantityModal (hand-typed kg or a target sum) — removal lives there too.
+ */
+function CartItemRow({ item, onEdit }: { item: CartItem; onEdit: () => void }) {
+  const { addItem, decrementItem, setItemQuantity } = useCart();
+  const { product, quantity } = item;
+  const unit = getProductUnit(product.id);
   // null = mirror the cart; a string while the cashier is mid-type, so typing
   // "27" isn't clamped/normalized after the first keystroke.
   const [qtyDraft, setQtyDraft] = useState<string | null>(null);
-  const [sumDraft, setSumDraft] = useState<string | null>(null);
 
   function applyQty(raw: string) {
     const n = Number(raw);
     if (raw !== '' && Number.isFinite(n)) setItemQuantity(product.id, n);
-  }
-  function applySum(raw: string) {
-    const n = Number(raw);
-    if (raw !== '' && Number.isFinite(n) && product.price > 0) {
-      setItemQuantity(product.id, Math.round(n / product.price));
-    }
   }
 
   return (
@@ -125,11 +269,11 @@ function CartItemRow({ item }: { item: CartItem }) {
         </div>
         <button
           type="button"
-          aria-label="O'chirish"
-          onClick={() => removeItem(product.id)}
-          className="h-10 w-10 -mt-1 -mr-1 shrink-0 flex items-center justify-center text-muted-foreground hover:text-destructive rounded-xl transition-colors press"
+          aria-label="Qo'lda kiritish"
+          onClick={onEdit}
+          className="h-10 w-10 -mt-1 -mr-1 shrink-0 flex items-center justify-center text-primary bg-primary/10 rounded-xl transition-colors press"
         >
-          <Trash2 className="h-5 w-5" />
+          <Pencil className="h-5 w-5" />
         </button>
       </div>
       <div className="flex items-center justify-between gap-2">
@@ -138,7 +282,7 @@ function CartItemRow({ item }: { item: CartItem }) {
           <button
             type="button"
             aria-label="Kamaytirish"
-            onClick={() => { setQtyDraft(null); setSumDraft(null); decrementItem(product.id); }}
+            onClick={() => { setQtyDraft(null); decrementItem(product.id); }}
             className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-foreground press"
           >
             <Minus className="h-4 w-4" />
@@ -151,41 +295,20 @@ function CartItemRow({ item }: { item: CartItem }) {
             className="w-14 h-10 text-center font-bold text-base tabular-nums bg-transparent outline-none rounded-lg focus:bg-muted/50"
             value={qtyDraft ?? String(quantity)}
             onFocus={e => e.target.select()}
-            onChange={e => { setQtyDraft(e.target.value); setSumDraft(null); applyQty(e.target.value); }}
+            onChange={e => { setQtyDraft(e.target.value); applyQty(e.target.value); }}
             onBlur={() => setQtyDraft(null)}
           />
           <button
             type="button"
             aria-label="Qo'shish"
             disabled={quantity >= product.stockQuantity}
-            onClick={() => { setQtyDraft(null); setSumDraft(null); addItem(product); }}
+            onClick={() => { setQtyDraft(null); addItem(product); }}
             className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center disabled:opacity-30 press"
           >
             <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>
-      {measured && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground shrink-0">Summa bilan:</span>
-          <div className="relative flex-1 min-w-0">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              aria-label="Summa bilan"
-              placeholder="0"
-              className="w-full h-10 rounded-xl bg-background border border-border/50 pl-3 pr-12 text-sm font-semibold text-right outline-none focus:border-primary"
-              value={sumDraft ?? String(product.price * quantity)}
-              onFocus={e => e.target.select()}
-              onChange={e => { setSumDraft(e.target.value); setQtyDraft(null); applySum(e.target.value); }}
-              onBlur={() => setSumDraft(null)}
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">so'm</span>
-          </div>
-          <span className="text-sm font-bold shrink-0 tabular-nums">= {quantity} {unit}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -194,6 +317,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
   open: boolean; onOpenChange: (v: boolean) => void; onCompleted: () => void;
 }) {
   const { items, totalPrice, clear } = useCart();
+  const [editProduct, setEditProduct] = useState<ProductResponse | null>(null);
   const form = useForm<CheckoutForm>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: { paymentMethod: 'CASH', customerName: '', customerPhone: '' },
@@ -277,7 +401,9 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
                 <ShoppingCart className="h-12 w-12 mb-3" />
                 <p>Savatcha bo'sh</p>
               </div>
-            ) : items.map(c => <CartItemRow key={c.product.id} item={c} />)}
+            ) : items.map(c => (
+              <CartItemRow key={c.product.id} item={c} onEdit={() => setEditProduct(c.product)} />
+            ))}
           </div>
 
           <Form {...form}>
@@ -380,6 +506,11 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
           </Button>
         </div>
       </div>
+      <QuantityModal
+        product={editProduct}
+        open={!!editProduct}
+        onOpenChange={v => { if (!v) setEditProduct(null); }}
+      />
     </MobileOverlay>
   );
 }
@@ -391,6 +522,7 @@ export default function SellPage() {
   const [search, setSearch] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [gridEditProduct, setGridEditProduct] = useState<ProductResponse | null>(null);
   const { totalCount, totalPrice, addItem, quantityOf } = useCart();
 
   // Nothing sold out belongs on a till screen — you cannot sell it, and it only
@@ -487,7 +619,9 @@ export default function SellPage() {
             </div>
           ) : sellable.length === 0 ? (
             <p className="col-span-full text-center py-10 text-sm text-muted-foreground">Mahsulot topilmadi</p>
-          ) : sellable.map(p => <ProductGridCard key={p.id} product={p} />)}
+          ) : sellable.map(p => (
+            <ProductGridCard key={p.id} product={p} onEdit={() => setGridEditProduct(p)} />
+          ))}
         </div>
       </div>
 
@@ -515,6 +649,11 @@ export default function SellPage() {
         onOpenChange={setScannerOpen}
         onDetected={handleScanned}
         title="Mahsulotni skanerlash"
+      />
+      <QuantityModal
+        product={gridEditProduct}
+        open={!!gridEditProduct}
+        onOpenChange={v => { if (!v) setGridEditProduct(null); }}
       />
       <CheckoutSheet open={checkoutOpen} onOpenChange={setCheckoutOpen} onCompleted={() => load(search)} />
     </MainLayout>
