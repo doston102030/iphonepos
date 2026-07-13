@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, ShoppingCart, Minus, Plus, Package, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -15,7 +15,9 @@ import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { useCart } from '@/contexts/CartContext';
-import { productsApi, ordersApi, fetchAllPages, type ProductResponse } from '@/lib/api';
+import {
+  productsApi, ordersApi, fetchAllPages, newIdempotencyKey, type ProductResponse,
+} from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
 
 // The API's paymentMethod also allows MIXED, but that needs a paidAmount split
@@ -90,8 +92,16 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
   const paymentMethod = form.watch('paymentMethod');
   const isCredit = paymentMethod === 'CREDIT';
 
+  // One key per opened cart, deliberately NOT per submit: if the first attempt's
+  // response is lost to a dropped connection, the retry carries the same key and
+  // the server returns the sale it already recorded instead of charging twice.
+  const idempotencyKey = useRef(newIdempotencyKey());
+
   useEffect(() => {
-    if (open) form.reset({ paymentMethod: 'CASH', customerName: '', customerPhone: '' });
+    if (open) {
+      form.reset({ paymentMethod: 'CASH', customerName: '', customerPhone: '' });
+      idempotencyKey.current = newIdempotencyKey();
+    }
   }, [open, form]);
 
   async function onSubmit(values: CheckoutForm) {
@@ -109,7 +119,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
         customerPhone: values.customerPhone || undefined,
         // Qarzga: nothing is paid up front, the balance becomes a debt.
         paidAmount: values.paymentMethod === 'CREDIT' ? 0 : undefined,
-      });
+      }, idempotencyKey.current);
       toast.success('Savdo yakunlandi');
       clear();
       onOpenChange(false);

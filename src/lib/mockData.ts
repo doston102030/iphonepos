@@ -13,7 +13,7 @@ import type {
   ProductRequest, ProductResponse, ProductSalesResponse, RestockRequest, SalesReportResponse,
   SettingsRequest, SettingsResponse, SmsBalanceResponse, SmsCampaignResponse, SmsSendRequest,
   StockMovementResponse, StockReceiveRequest,
-  UserRequest, UserResponse, UserSalesResponse,
+  UserRequest, UserUpdateRequest, UserResponse, UserSalesResponse,
 } from './api';
 
 // Mirrors LOW_STOCK_THRESHOLD in api.ts. Kept as a local literal on purpose:
@@ -258,10 +258,11 @@ export const mockUsersApi = {
     mockUsers.push(user);
     return delay(toUserResponse(user));
   },
-  update: (id: number, body: UserRequest): Promise<UserResponse> => {
+  update: (id: number, body: UserUpdateRequest): Promise<UserResponse> => {
     const user = mockUsers.find(u => u.id === id);
     if (!user) return Promise.reject(new Error("Ma'lumot topilmadi."));
-    user.pin = body.pin;
+    // An omitted PIN keeps the current one — same as UserUpdateRequest allows.
+    if (body.pin) user.pin = body.pin;
     user.fullName = body.fullName;
     user.role = body.role;
     return delay(toUserResponse(user));

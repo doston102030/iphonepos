@@ -32,11 +32,13 @@ import {
 import { getRoleBadgeVariant, getRoleLabel } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
-// The API only knows CASHIER and SUPER_ADMIN, and it requires a 4-digit PIN on
-// create *and* update — so PIN stays required when editing.
+// The API only knows CASHIER and SUPER_ADMIN. PIN is required to create a user
+// (UserRequest) but optional to update one (UserUpdateRequest) — so an empty PIN
+// is legal when editing and means "keep the current one". Demanding a new PIN
+// just to rename someone was our invention, not the contract's.
 const userSchema = z.object({
   fullName: z.string().min(1, "To'liq ism kiritilishi shart"),
-  pin: z.string().regex(/^\d{4}$/, "PIN 4 ta raqamdan iborat bo'lishi kerak"),
+  pin: z.string().regex(/^\d{4}$/, "PIN 4 ta raqamdan iborat bo'lishi kerak").or(z.literal('')),
   role: z.enum(['CASHIER', 'SUPER_ADMIN']),
 });
 
@@ -62,12 +64,22 @@ function UserDialog({
   }, [user, open, form]);
 
   async function onSubmit(values: UserForm) {
+    // A new user must get a PIN — there is no other way to log in.
+    if (!user && !values.pin) {
+      form.setError('pin', { message: 'PIN kiritilishi shart' });
+      return;
+    }
     try {
       if (user) {
-        await usersApi.update(user.id, values);
+        await usersApi.update(user.id, {
+          fullName: values.fullName,
+          role: values.role,
+          // Left blank: keep whatever PIN they have now.
+          pin: values.pin || undefined,
+        });
         toast.success('Foydalanuvchi yangilandi');
       } else {
-        await usersApi.create(values);
+        await usersApi.create({ ...values, pin: values.pin });
         toast.success('Foydalanuvchi yaratildi');
       }
       onSaved();
@@ -96,11 +108,14 @@ function UserDialog({
           )} />
           <FormField control={form.control} name="pin" render={({ field }) => (
             <FormItem>
-              <FormLabel>PIN kod (4 ta raqam)</FormLabel>
+              <FormLabel>
+                {user ? "PIN kod (o'zgartirmasangiz — bo'sh qoldiring)" : 'PIN kod (4 ta raqam)'}
+              </FormLabel>
               <FormControl>
                 <Input
                   className="h-11" type="password" inputMode="numeric"
-                  maxLength={4} autoComplete="off" placeholder="••••" {...field}
+                  maxLength={4} autoComplete="off"
+                  placeholder={user ? 'O‘zgarishsiz' : '••••'} {...field}
                 />
               </FormControl>
               <FormMessage />

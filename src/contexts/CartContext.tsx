@@ -18,16 +18,47 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
+const STORAGE_KEY = 'cart';
+
+/** The cart is stored under the cashier who built it, never shared across them. */
+function storageKeyFor(userId: number | null): string | null {
+  return userId === null ? null : `${STORAGE_KEY}:${userId}`;
+}
+
+function readCart(userId: number | null): CartItem[] {
+  const key = storageKeyFor(userId);
+  if (!key) return [];
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
   const { user } = useAuth();
   const userId = user?.id ?? null;
+
+  // Survives a reload: a phone that reloads the tab mid-sale — or a cashier who
+  // pulls to refresh by accident — used to lose the whole basket.
+  const [items, setItems] = useState<CartItem[]>(() => readCart(userId));
 
   // A cart belongs to the cashier who built it. "Chiqish" is a client-side
   // navigation — this provider is never unmounted — so without this the next
   // cashier logged in to find the previous one's basket waiting, and could ring
   // it up under their own name.
-  useEffect(() => { setItems([]); }, [userId]);
+  useEffect(() => { setItems(readCart(userId)); }, [userId]);
+
+  useEffect(() => {
+    const key = storageKeyFor(userId);
+    if (!key) return;
+    try {
+      if (items.length === 0) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(items));
+    } catch { /* private mode / quota: the cart just stays in memory */ }
+  }, [items, userId]);
 
   const addItem = useCallback((product: ProductResponse) => {
     setItems(prev => {

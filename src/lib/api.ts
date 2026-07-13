@@ -35,7 +35,8 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
+  extraHeaders?: Record<string, string>
 ): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin);
   if (params) {
@@ -47,7 +48,7 @@ async function request<T>(
   }
 
   const token = getToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extraHeaders };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   let response: Response;
@@ -173,6 +174,8 @@ export const authApi = USE_MOCK ? mockAuthApi : {
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 export interface UserRequest { pin: string; fullName: string; role: Role }
+/** PUT takes UserUpdateRequest: `pin` is optional — omit it to keep the current one. */
+export interface UserUpdateRequest { pin?: string; fullName: string; role: Role }
 export interface UserResponse { id: number; fullName: string; role: Role; active: boolean }
 export interface UserStatusRequest { active: boolean }
 
@@ -181,7 +184,7 @@ export const usersApi = USE_MOCK ? mockUsersApi : {
     request<PagedResponse<UserResponse>>('GET', '/api/users', undefined, { page, size }),
   getById: (id: number) => request<UserResponse>('GET', `/api/users/${id}`),
   create: (body: UserRequest) => request<UserResponse>('POST', '/api/users', body),
-  update: (id: number, body: UserRequest) => request<UserResponse>('PUT', `/api/users/${id}`, body),
+  update: (id: number, body: UserUpdateRequest) => request<UserResponse>('PUT', `/api/users/${id}`, body),
   delete: (id: number) => request<void>('DELETE', `/api/users/${id}`),
   toggleStatus: (id: number, active: boolean) =>
     request<UserResponse>('PATCH', `/api/users/${id}/status`, { active } satisfies UserStatusRequest),
@@ -241,11 +244,6 @@ export const productsApi = USE_MOCK ? mockProductsApi : {
     request<StockMovementResponse[]>('GET', `/api/products/${id}/restock-history`),
 };
 
-export const outflowsApi = {
-  getAll: (page = 0, size = 20) =>
-    request<PagedResponse<OutflowResponse>>('GET', '/api/outflows', undefined, { page, size }),
-};
-
 // ─── Orders ──────────────────────────────────────────────────────────────────
 export type PaymentMethod = 'CASH' | 'CARD' | 'MIXED' | 'CREDIT';
 
@@ -271,11 +269,25 @@ export interface OrderResponse {
   items: OrderItemResponse[];
 }
 
+/**
+ * A stable key for one attempted sale. POST /api/orders accepts an
+ * `Idempotency-Key` header, and the till is exactly where it matters: if the
+ * response is lost to a dropped connection and the cashier presses "Tasdiqlash"
+ * again, the same key makes the server return the sale it already recorded
+ * instead of recording it twice and taking the customer's money twice.
+ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export const ordersApi = USE_MOCK ? mockOrdersApi : {
   getAll: (page = 0, size = 20) =>
     request<PagedResponse<OrderResponse>>('GET', '/api/orders', undefined, { page, size }),
   getById: (id: number) => request<OrderResponse>('GET', `/api/orders/${id}`),
-  create: (body: OrderRequest) => request<OrderResponse>('POST', '/api/orders', body),
+  create: (body: OrderRequest, idempotencyKey?: string) =>
+    request<OrderResponse>('POST', '/api/orders', body, undefined,
+      idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined),
 };
 
 // ─── Debts ───────────────────────────────────────────────────────────────────

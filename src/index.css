@@ -127,9 +127,14 @@
 
 @layer base {
   :root {
-    /* Height the mobile tab bar occupies, including the iPhone home indicator.
-       Pages pad their scroll area by this so nothing hides behind the bar. */
-    --bottom-nav-h: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    /* The mobile tab bar is a floating dock: a rounded glass pill of --dock-h,
+       held clear of the screen edge by --dock-gap plus the iPhone home
+       indicator. --bottom-nav-h is the total space it occupies; pages pad their
+       scroll area by it so nothing hides behind the dock. Derived, not
+       hand-tuned — change --dock-h/--dock-gap and the padding follows. */
+    --dock-h: 4rem;
+    --dock-gap: 0.75rem;
+    --bottom-nav-h: calc(var(--dock-h) + var(--dock-gap) + env(safe-area-inset-bottom, 0px));
   }
 
   * {
@@ -214,7 +219,12 @@
     margin-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  /* Clears the mobile tab bar (bar height + home indicator). */
+  /* Lifts the floating dock off the screen edge, above the home indicator. */
+  .nav-dock-inset {
+    padding-bottom: calc(var(--dock-gap) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Clears the mobile tab bar (dock height + gap + home indicator). */
   .pb-nav {
     padding-bottom: var(--bottom-nav-h);
   }

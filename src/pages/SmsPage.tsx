@@ -18,9 +18,10 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
+import { PaginationControls } from '@/components/common/PaginationControls';
 import {
   smsApi, type SmsCampaignResponse, type SmsBalanceResponse,
-  parseRecipients, extractContent
+  parseRecipients, extractContent, extractPage
 } from '@/lib/api';
 import { formatDateTime } from '@/lib/utils';
 
@@ -103,6 +104,10 @@ function SendSmsDialog({ open, onOpenChange, onSaved }: {
   );
 }
 
+// The endpoint is paged. Without controls, campaign #21 and everything older was
+// simply unreachable, with nothing on screen saying more existed.
+const PAGE_SIZE = 20;
+
 export default function SmsPage() {
   // null = the fetch failed. [] = there really are no campaigns. Rendering
   // "Kampaniya yo'q" for both would state something we do not know.
@@ -110,6 +115,9 @@ export default function SmsPage() {
   const [balance, setBalance] = useState<SmsBalanceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [sendOpen, setSendOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
   const isMobile = useIsMobile();
 
   // Separately settled: /api/sms/balance answers 501 until the Eskiz integration
@@ -119,16 +127,23 @@ export default function SmsPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     const [c, b] = await Promise.allSettled([
-      smsApi.getCampaigns(),
+      smsApi.getCampaigns(page, PAGE_SIZE),
       smsApi.getBalance(),
     ]);
 
-    if (c.status === 'fulfilled') setCampaigns(extractContent(c.value));
-    else { setCampaigns(null); toast.error('Kampaniyalar yuklanmadi'); }
+    if (c.status === 'fulfilled') {
+      setCampaigns(extractContent(c.value));
+      const pg = extractPage(c.value);
+      setTotalPages(pg.totalPages);
+      setTotalElements(pg.totalElements);
+    } else {
+      setCampaigns(null);
+      toast.error('Kampaniyalar yuklanmadi');
+    }
 
     setBalance(b.status === 'fulfilled' ? b.value : null);
     setLoading(false);
-  }, []);
+  }, [page]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -274,6 +289,16 @@ export default function SmsPage() {
                 </TableBody>
               </Table>
             </div>
+            )}
+
+            {campaigns && campaigns.length > 0 && (
+              <div className="px-4 py-3">
+                <PaginationControls
+                  page={page} totalPages={totalPages}
+                  totalElements={totalElements} size={PAGE_SIZE}
+                  onPageChange={setPage}
+                />
+              </div>
             )}
           </CardContent>
         </Card>
