@@ -58,10 +58,11 @@ const restockSchema = z.object({
   quantity: z.coerce.number().min(1, 'Miqdor 1 dan katta bo\'lishi kerak'),
 });
 
+// `note` is optional on the server too, and the three reasons already say what
+// happened — so the form does not ask for it.
 const outflowSchema = z.object({
   quantity: z.coerce.number().min(1, 'Miqdor 1 dan katta bo\'lishi kerak'),
   reason: z.enum(['DAMAGED', 'LOST', 'RETURNED'], { required_error: 'Sabab tanlanishi shart' }),
-  note: z.string().optional(),
 });
 
 const receiveSchema = z.object({
@@ -277,9 +278,9 @@ function OutflowDialog({
 }) {
   const form = useForm<OutflowForm>({
     resolver: zodResolver(outflowSchema),
-    defaultValues: { quantity: 1, note: '' },
+    defaultValues: { quantity: 1 },
   });
-  useEffect(() => { if (open) form.reset({ quantity: 1, note: '' }); }, [open, form]);
+  useEffect(() => { if (open) form.reset({ quantity: 1 }); }, [open, form]);
 
   async function onSubmit(values: OutflowForm) {
     if (!product) return;
@@ -328,13 +329,6 @@ function OutflowDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <FormMessage />
-            </FormItem>
-          )} />
-          <FormField control={form.control} name="note" render={({ field }) => (
-            <FormItem>
-              <FormLabel className="font-semibold text-muted-foreground">Izoh (ixtiyoriy)</FormLabel>
-              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" placeholder="Izoh..." autoComplete="off" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />

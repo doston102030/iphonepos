@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ShoppingCart, CreditCard, Warehouse,
   BarChart3, MessageSquare, Settings, Users, LogOut,
-  ChevronRight, ChevronLeft, Sun, Moon, MoreHorizontal, TrendingUp, Receipt,
+  ChevronRight, ChevronLeft, Sun, Moon, TrendingUp, Receipt, Boxes,
 } from 'lucide-react';
 import useGoBack from '@/hooks/use-go-back';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ const navItems: NavItem[] = [
   { label: 'Bosh sahifa', path: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Sotish', path: '/sell', icon: <ShoppingCart className="h-4 w-4" /> },
   { label: 'Mahsulotlar', path: '/products', icon: <Package className="h-4 w-4" /> },
+  { label: 'Ombor', path: '/stock', icon: <Boxes className="h-4 w-4" /> },
   { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" /> },
   { label: 'Qarzlar', path: '/debts', icon: <CreditCard className="h-4 w-4" /> },
   { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
@@ -37,10 +38,14 @@ const navItems: NavItem[] = [
   { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
 ];
 
+// The "Ko'proq" tab is gone — Ombor took its slot. The same sheet still opens
+// from the avatar in the header, and it now carries SMS and Sozlamalar too,
+// which had no way in on a phone at all.
 const bottomTabs = [
   { label: 'Bosh sahifa', path: '/', icon: LayoutDashboard },
   { label: 'Sotish', path: '/sell', icon: ShoppingCart },
   { label: 'Mahsulotlar', path: '/products', icon: Package },
+  { label: 'Ombor', path: '/stock', icon: Boxes },
   { label: 'Qarzlar', path: '/debts', icon: CreditCard },
 ];
 
@@ -48,6 +53,8 @@ const cashierMoreItems: NavItem[] = [
   { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" /> },
   { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
   { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
+  { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" /> },
+  { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
 ];
 
 const superAdminMoreItems: NavItem[] = [
@@ -56,6 +63,8 @@ const superAdminMoreItems: NavItem[] = [
   { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
   { label: 'Foyda / Zarar', path: '/profit', icon: <TrendingUp className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
   { label: 'Foydalanuvchilar', path: '/users', icon: <Users className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
+  { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" /> },
+  { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
 ];
 
 function ThemeToggle({ className }: { className?: string }) {
@@ -153,8 +162,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
-  onMoreOpen: () => void; cartCount: number; unpaidDebtsCount: number;
+function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
+  cartCount: number; unpaidDebtsCount: number;
 }) {
   const location = useLocation();
 
@@ -196,16 +205,6 @@ function MobileBottomNav({ onMoreOpen, cartCount, unpaidDebtsCount }: {
             </Link>
           );
         })}
-        <button
-          type="button"
-          onClick={onMoreOpen}
-          className={cn(tabClass, 'text-muted-foreground')}
-        >
-          <span className="flex items-center justify-center h-9 w-12 rounded-xl">
-            <MoreHorizontal className="h-[22px] w-[22px]" />
-          </span>
-          <span>Ko'proq</span>
-        </button>
       </div>
     </nav>
   );
@@ -325,7 +324,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             {user && (
               <button
                 type="button"
-                aria-label="Profil"
+                aria-label="Menyu"
                 onClick={() => setMoreOpen(true)}
                 className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center transition-colors hover:bg-primary/20 press"
               >
@@ -343,7 +342,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </main>
         <div className="md:hidden">
           <MobileBottomNav
-            onMoreOpen={() => setMoreOpen(true)}
             cartCount={totalCount}
             unpaidDebtsCount={unpaidDebtsCount}
           />
