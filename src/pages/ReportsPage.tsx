@@ -18,6 +18,7 @@ import {
 import {
   formatCurrency, formatDate, getRoleLabel, todayStr, daysAgoStr,
 } from '@/lib/utils';
+import { getProductUnit } from '@/lib/units';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
@@ -95,7 +96,7 @@ function TopProductsCard({ data }: { data: SalesReportResponse | null }) {
                 {p.productName}
               </span>
               <span className="shrink-0 text-sm font-semibold text-foreground">
-                {p.quantitySold} dona
+                {p.quantitySold} {getProductUnit(p.productId)}
               </span>
             </li>
           ))}

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShoppingCart, Package, CreditCard, TrendingUp,
-  Warehouse, Wallet, TrendingDown, Percent, Trophy, AlertTriangle,
+  Warehouse, Wallet, TrendingDown, Trophy, AlertTriangle, Users, CalendarDays,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,14 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import {
-  reportsApi, ordersApi, inventorySummary, marginPct,
+  reportsApi, ordersApi, inventorySummary,
   type SalesReportResponse, type OrderResponse, type PaymentMethod,
+  type UserSalesResponse,
   extractContent,
 } from '@/lib/api';
 import {
-  cn, formatCurrency, formatDateTime, getPaymentMethodLabel,
-  todayStr, daysAgoStr, monthStartStr,
+  cn, formatCurrency, formatDateTime, getPaymentMethodLabel, getRoleLabel,
+  todayStr, daysAgoStr, monthStartStr, uzDayLabel,
 } from '@/lib/utils';
+import { getProductUnit } from '@/lib/units';
 import { useAuth } from '@/contexts/AuthContext';
 
 /** What inventorySummary() can actually derive — no inventory value exists. */
@@ -25,10 +27,10 @@ interface InventoryStats { totalProducts: number; lowStockCount: number }
 
 
 function KpiCard({
-  title, value, sub, icon, tone = 'default',
-}: { title: string; value: string; sub?: string; icon: React.ReactNode; tone?: 'default' | 'brand' | 'success' | 'destructive' }) {
+  title, value, sub, icon, tone = 'default', className,
+}: { title: string; value: string; sub?: string; icon: React.ReactNode; tone?: 'default' | 'brand' | 'success' | 'destructive'; className?: string }) {
   return (
-    <Card className="shadow-card rounded-2xl">
+    <Card className={cn('shadow-card rounded-2xl', className)}>
       <CardContent className="p-4 md:p-5">
         <div className="flex items-start justify-between gap-2 mb-2.5">
           <p className="text-[13px] text-muted-foreground font-medium leading-tight">{title}</p>
@@ -69,73 +71,132 @@ function paymentBadgeVariant(method: PaymentMethod): 'default' | 'secondary' | '
 }
 
 export default function DashboardPage() {
-  const [today, setToday] = useState<SalesReportResponse | null>(null);
+  // The day under inspection. Defaults to today; the chip in the header points
+  // the whole daily half of the page (KPIs, split, staff, top products) at any
+  // past day, while week/month/inventory/orders stay anchored to now.
+  const [date, setDate] = useState(todayStr);
+  const [day, setDay] = useState<SalesReportResponse | null>(null);
+  const [staffSales, setStaffSales] = useState<UserSalesResponse[] | null>(null);
   const [week, setWeek] = useState<SalesReportResponse | null>(null);
   const [month, setMonth] = useState<SalesReportResponse | null>(null);
   const [inventory, setInventory] = useState<InventoryStats | null>(null);
   const [recentOrders, setRecentOrders] = useState<OrderResponse[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const [dayLoading, setDayLoading] = useState(true);
+  const [restLoading, setRestLoading] = useState(true);
+  const [dayFailed, setDayFailed] = useState(false);
+  const [restFailed, setRestFailed] = useState(false);
   const { user, isSuperAdmin } = useAuth();
 
   // allSettled, not all: one dead endpoint used to reject the whole batch, and
   // the `.catch(() => null)` under it left every card rendering a confident 0 —
   // a cashier could not tell "sotuv bo'lmadi" from "server javob bermadi".
   // Whatever does load is shown; whatever fails shows "—" and says so.
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [d, w, m, inv, ord] = await Promise.allSettled([
-      reportsApi.daily(),
+  const loadDay = useCallback(async () => {
+    setDayLoading(true);
+    // daily() without a date lets the SERVER pick "today", and its clock may
+    // sit on the other side of midnight from the shop's — so the KPI cards and
+    // the per-cashier list below could describe two different days. One
+    // explicit local date keeps everything on this screen on the same day.
+    const [d, staff] = await Promise.allSettled([
+      reportsApi.daily(date),
+      reportsApi.byUser(date, date),
+    ]);
+
+    setDay(d.status === 'fulfilled' ? d.value : null);
+    setStaffSales(staff.status === 'fulfilled'
+      ? [...staff.value].sort((a, b) => b.totalRevenue - a.totalRevenue)
+      : null);
+    setDayFailed([d, staff].some(r => r.status === 'rejected'));
+    setDayLoading(false);
+  }, [date]);
+
+  const loadRest = useCallback(async () => {
+    setRestLoading(true);
+    const [w, m, inv, ord] = await Promise.allSettled([
       reportsApi.range(daysAgoStr(6), todayStr()),
       reportsApi.range(monthStartStr(), todayStr()),
       inventorySummary(),
       ordersApi.getAll(0, 5),
     ]);
 
-    setToday(d.status === 'fulfilled' ? d.value : null);
     setWeek(w.status === 'fulfilled' ? w.value : null);
     setMonth(m.status === 'fulfilled' ? m.value : null);
     setInventory(inv.status === 'fulfilled' ? inv.value : null);
     setRecentOrders(ord.status === 'fulfilled' ? extractContent(ord.value) : null);
-    setFailed([d, w, m, inv, ord].some(r => r.status === 'rejected'));
-    setLoading(false);
+    setRestFailed([w, m, inv, ord].some(r => r.status === 'rejected'));
+    setRestLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadDay(); }, [loadDay]);
+  useEffect(() => { loadRest(); }, [loadRest]);
+
+  const isToday = date === todayStr();
+  const failed = dayFailed || restFailed;
+  const anyLoading = dayLoading || restLoading;
 
   // Revenue is not split by cash vs card, but the credit portion IS reported —
   // so the only honest split is "paid up front" vs "sold on credit".
-  const todayRevenue = today?.totalRevenue ?? 0;
-  const todayCredit = today?.creditSalesAmount ?? 0;
-  const todayPaid = Math.max(0, todayRevenue - todayCredit);
-  const splitBase = todayRevenue || 1;
+  const dayRevenue = day?.totalRevenue ?? 0;
+  const dayCredit = day?.creditSalesAmount ?? 0;
+  const dayPaid = Math.max(0, dayRevenue - dayCredit);
+  const splitBase = dayRevenue || 1;
 
-  const topProducts = today?.topProducts ?? [];
+  const topProducts = day?.topProducts ?? [];
 
   return (
     <MainLayout>
       <div className="p-4 md:p-6">
         <PageHeader
           title={`Xush kelibsiz, ${user?.fullName ?? ''}!`}
-          description="Bugungi savdo ko'rsatkichlari"
+          description={
+            <>
+              {isToday ? "Bugungi savdo ko'rsatkichlari" : "Savdo ko'rsatkichlari"}{' '}
+              {/* The invisible native date input stretched over the chip is what
+                  opens the system calendar — works without showPicker() support. */}
+              <span className="relative inline-flex items-center gap-1 align-middle rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                <CalendarDays className="h-3.5 w-3.5" />
+                {uzDayLabel(date)}
+                <input
+                  type="date"
+                  aria-label="Kunni tanlash"
+                  value={date}
+                  max={todayStr()}
+                  onChange={e => e.target.value && setDate(e.target.value)}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
+              </span>
+              {!isToday && (
+                <button
+                  type="button"
+                  onClick={() => setDate(todayStr())}
+                  className="ml-2 align-middle text-xs font-semibold text-primary underline underline-offset-2 press"
+                >
+                  Bugunga qaytish
+                </button>
+              )}
+            </>
+          }
         />
 
-        {failed && !loading && (
+        {failed && !anyLoading && (
           <div className="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3">
             <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
             <p className="flex-1 text-sm text-destructive font-medium leading-snug">
               Ba'zi ma'lumotlar yuklanmadi — "—" belgisi noldan emas, xatodan.
             </p>
-            <Button size="sm" variant="outline" className="shrink-0 press" onClick={load}>
+            <Button
+              size="sm" variant="outline" className="shrink-0 press"
+              onClick={() => { loadDay(); loadRest(); }}
+            >
               Qayta urinish
             </Button>
           </div>
         )}
 
-        {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="shadow-card rounded-2xl">
+        {dayLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i} className={cn('shadow-card rounded-2xl', i === 2 && 'col-span-2 md:col-span-1')}>
                 <CardContent className="p-4 md:p-5">
                   <Skeleton className="h-4 w-20 mb-3" />
                   <Skeleton className="h-7 w-24" />
@@ -144,29 +205,24 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-6">
             <KpiCard
-              title="Bugungi savdo"
-              value={today ? formatCurrency(todayRevenue) : '—'}
+              title={isToday ? 'Bugungi savdo' : 'Savdo'}
+              value={day ? formatCurrency(dayRevenue) : '—'}
               icon={<Wallet className="h-4 w-4" />}
               tone="brand"
             />
             <KpiCard
-              title="Bugungi foyda"
-              value={today ? formatCurrency(today.totalProfit) : '—'}
+              title={isToday ? 'Bugungi foyda' : 'Foyda'}
+              value={day ? formatCurrency(day.totalProfit) : '—'}
               icon={<TrendingUp className="h-4 w-4" />}
-              tone={(today?.totalProfit ?? 0) >= 0 ? 'success' : 'destructive'}
+              tone={(day?.totalProfit ?? 0) >= 0 ? 'success' : 'destructive'}
             />
             <KpiCard
               title="Buyurtmalar"
-              value={today ? String(today.totalOrders) : '—'}
+              value={day ? String(day.totalOrders) : '—'}
               icon={<ShoppingCart className="h-4 w-4" />}
-            />
-            <KpiCard
-              title="Marja"
-              value={today ? `${marginPct(today)}%` : '—'}
-              icon={<Percent className="h-4 w-4" />}
-              tone={today && marginPct(today) >= 0 ? 'success' : 'destructive'}
+              className="col-span-2 md:col-span-1"
             />
           </div>
         )}
@@ -174,17 +230,19 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card className="shadow-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Bugungi savdo taqsimoti</CardTitle>
+              <CardTitle className="text-sm font-semibold">
+                {isToday ? 'Bugungi savdo taqsimoti' : 'Savdo taqsimoti'}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {loading ? (
+              {dayLoading ? (
                 <Skeleton className="h-20 w-full" />
-              ) : !today ? (
+              ) : !day ? (
                 <p className="text-sm text-muted-foreground py-2">Ma'lumot yuklanmadi</p>
               ) : (
                 [
-                  { label: "To'langan", value: todayPaid, color: 'bg-success' },
-                  { label: 'Qarzga sotuv', value: todayCredit, color: 'bg-destructive' },
+                  { label: "To'langan", value: dayPaid, color: 'bg-success' },
+                  { label: 'Qarzga sotuv', value: dayCredit, color: 'bg-destructive' },
                 ].map(item => {
                   const pct = Math.round((item.value / splitBase) * 100);
                   return (
@@ -215,7 +273,7 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {loading ? <Skeleton className="h-16 w-full" /> : (
+              {restLoading ? <Skeleton className="h-16 w-full" /> : (
                 <>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Mahsulotlar</span>
@@ -239,11 +297,67 @@ export default function DashboardPage() {
           </Card>
         </div>
 
+        <Card className="shadow-card mb-6">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+              <Users className="h-4 w-4 text-primary" /> Xodimlar savdosi
+            </CardTitle>
+            <span className="text-xs text-muted-foreground font-medium shrink-0">
+              {isToday ? 'Bugun' : uzDayLabel(date)}
+            </span>
+          </CardHeader>
+          <CardContent className="space-y-3.5">
+            {dayLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : !staffSales ? (
+              <p className="text-sm text-muted-foreground py-2">Ma'lumot yuklanmadi</p>
+            ) : staffSales.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">
+                {isToday ? "Bugun sotuv bo'lmagan" : "Bu kunda sotuv bo'lmagan"}
+              </p>
+            ) : (
+              staffSales.map((s, i) => {
+                // Bars are relative to today's best seller, so the leader is
+                // always full and everyone else reads as "share of the leader".
+                const maxRevenue = staffSales[0].totalRevenue || 1;
+                const pct = Math.max(2, Math.round((s.totalRevenue / maxRevenue) * 100));
+                return (
+                  <div key={s.userId} className="flex items-center gap-3">
+                    <div className={cn(
+                      'h-9 w-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold',
+                      i === 0 ? 'bg-gradient-primary text-white shadow-md' : 'bg-muted text-muted-foreground',
+                    )}>
+                      {s.fullName?.[0]?.toUpperCase() ?? '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-sm font-semibold truncate">{s.fullName}</p>
+                        <p className="text-sm font-bold shrink-0">{formatCurrency(s.totalRevenue)}</p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {getRoleLabel(s.role)} · {s.totalOrders} ta buyurtma
+                        </p>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1.5">
+                        <div
+                          className={cn('h-full rounded-full', i === 0 ? 'bg-gradient-primary' : 'bg-primary/50')}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card className="shadow-card">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Bu hafta</CardTitle></CardHeader>
             <CardContent>
-              {loading ? <Skeleton className="h-12 w-full" /> : (
+              {restLoading ? <Skeleton className="h-12 w-full" /> : (
                 <div className="grid grid-cols-3 gap-2">
                   <MiniStat label="Savdo" value={week ? formatCurrency(week.totalRevenue) : '—'} />
                   <MiniStat label="Foyda" value={week ? formatCurrency(week.totalProfit) : '—'} />
@@ -255,7 +369,7 @@ export default function DashboardPage() {
           <Card className="shadow-card">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Bu oy</CardTitle></CardHeader>
             <CardContent>
-              {loading ? <Skeleton className="h-12 w-full" /> : (
+              {restLoading ? <Skeleton className="h-12 w-full" /> : (
                 <div className="grid grid-cols-3 gap-2">
                   <MiniStat label="Savdo" value={month ? formatCurrency(month.totalRevenue) : '—'} />
                   <MiniStat label="Foyda" value={month ? formatCurrency(month.totalProfit) : '—'} />
@@ -274,14 +388,16 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {loading ? (
+              {dayLoading ? (
                 <Skeleton className="h-20 w-full" />
-              ) : !today ? (
-                // "Bugun sotuv bo'lmagan" is a claim about the shop's day. When
-                // the request failed we know nothing about the shop's day.
+              ) : !day ? (
+                // "Sotuv bo'lmagan" is a claim about the shop's day. When the
+                // request failed we know nothing about the shop's day.
                 <p className="text-sm text-muted-foreground py-2">Ma'lumot yuklanmadi</p>
               ) : topProducts.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">Bugun sotuv bo'lmagan</p>
+                <p className="text-sm text-muted-foreground py-2">
+                  {isToday ? "Bugun sotuv bo'lmagan" : "Bu kunda sotuv bo'lmagan"}
+                </p>
               ) : (
                 topProducts.map((p, i) => (
                   <div key={p.productId} className="flex items-center justify-between gap-2 text-sm">
@@ -291,7 +407,7 @@ export default function DashboardPage() {
                       </span>
                       <span className="truncate">{p.productName}</span>
                     </div>
-                    <span className="font-semibold shrink-0">{p.quantitySold} dona</span>
+                    <span className="font-semibold shrink-0">{p.quantitySold} {getProductUnit(p.productId)}</span>
                   </div>
                 ))
               )}
@@ -330,7 +446,7 @@ export default function DashboardPage() {
             <Link to="/orders" className="text-xs text-primary font-medium shrink-0">Barchasi →</Link>
           </CardHeader>
           <CardContent className="p-0">
-            {loading ? (
+            {restLoading ? (
               <div className="p-4 space-y-2">
                 {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>

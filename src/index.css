@@ -86,9 +86,11 @@
     --sidebar-accent-foreground: 240 6% 10%;
     --sidebar-border: 240 11% 91%;
     --sidebar-ring: 211 100% 46%;
-    /* iOS shadows are wide and faint, never a hard drop. */
-    --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 6px 16px -6px rgba(0,0,0,0.08);
-    --shadow-hover: 0 2px 4px rgba(0,0,0,0.05), 0 12px 28px -8px rgba(0,0,0,0.14);
+    /* Still soft-edged, but deep enough that a white card visibly lifts off
+       the grey background instead of melting into it: a tight contact line,
+       a mid layer for body, and a wide ambient layer for depth. */
+    --shadow-card: 0 1px 2px rgba(16,24,40,0.06), 0 4px 10px rgba(16,24,40,0.07), 0 14px 30px -8px rgba(16,24,40,0.16);
+    --shadow-hover: 0 2px 4px rgba(16,24,40,0.08), 0 8px 18px rgba(16,24,40,0.10), 0 22px 44px -10px rgba(16,24,40,0.24);
     --gradient-primary: linear-gradient(135deg, #0073ED 0%, #34AADC 100%);
     --gradient-card: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
     --gradient-background: linear-gradient(180deg, #f7f7fa 0%, #f2f2f7 100%);
@@ -132,8 +134,8 @@
     --sidebar-accent-foreground: 0 0% 96%;
     --sidebar-border: 240 5% 18%;
     --sidebar-ring: 211 100% 52%;
-    --shadow-card: 0 1px 2px rgba(0,0,0,0.4), 0 6px 16px -6px rgba(0,0,0,0.5);
-    --shadow-hover: 0 2px 4px rgba(0,0,0,0.45), 0 12px 28px -8px rgba(0,0,0,0.6);
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.45), 0 16px 34px -8px rgba(0,0,0,0.7);
+    --shadow-hover: 0 2px 4px rgba(0,0,0,0.55), 0 8px 20px rgba(0,0,0,0.5), 0 24px 48px -10px rgba(0,0,0,0.8);
     --gradient-primary: linear-gradient(135deg, #0A84FF 0%, #5AC8FA 100%);
     --gradient-card: linear-gradient(180deg, hsl(240 5% 13%) 0%, hsl(240 5% 11%) 100%);
     --gradient-background: linear-gradient(180deg, hsl(240 6% 8%) 0%, hsl(240 6% 6%) 100%);

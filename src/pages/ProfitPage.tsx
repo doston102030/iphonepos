@@ -19,6 +19,7 @@ import {
 import {
   formatCurrency, formatDate, cn, todayStr, daysAgoStr,
 } from '@/lib/utils';
+import { getProductUnit } from '@/lib/units';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
@@ -202,7 +203,7 @@ export default function ProfitPage() {
                       {i + 1}
                     </span>
                     <p className="text-sm font-semibold truncate flex-1 min-w-0">{p.productName}</p>
-                    <span className="text-sm font-bold shrink-0">{p.quantitySold} dona</span>
+                    <span className="text-sm font-bold shrink-0">{p.quantitySold} {getProductUnit(p.productId)}</span>
                   </div>
                 ))}
               </div>
@@ -221,7 +222,7 @@ export default function ProfitPage() {
                       <TableRow key={p.productId}>
                         <TableCell className="whitespace-nowrap text-muted-foreground">{i + 1}</TableCell>
                         <TableCell className="whitespace-nowrap font-medium">{p.productName}</TableCell>
-                        <TableCell className="whitespace-nowrap text-right font-semibold">{p.quantitySold} dona</TableCell>
+                        <TableCell className="whitespace-nowrap text-right font-semibold">{p.quantitySold} {getProductUnit(p.productId)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

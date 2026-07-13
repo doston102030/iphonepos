@@ -11,6 +11,7 @@ import {
   LOW_STOCK_THRESHOLD, type ProductResponse,
 } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
+import { getProductUnit } from '@/lib/units';
 
 type StockGroup = 'IN_STOCK' | 'LOW' | 'OUT';
 
@@ -56,7 +57,7 @@ function StockCard({ product }: { product: ProductResponse }) {
         </div>
         <div className="shrink-0 text-right">
           <p className={cn('text-lg font-black tabular-nums', tone)}>{product.stockQuantity}</p>
-          <p className="text-[11px] text-muted-foreground">dona</p>
+          <p className="text-[11px] text-muted-foreground">{getProductUnit(product.id)}</p>
         </div>
       </CardContent>
     </Card>

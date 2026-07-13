@@ -19,6 +19,7 @@ import {
   productsApi, ordersApi, fetchAllPages, newIdempotencyKey, type ProductResponse,
 } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
+import { getProductUnit } from '@/lib/units';
 import { notify } from '@/lib/notify';
 
 // The API's paymentMethod also allows MIXED, but that needs a paidAmount split
@@ -57,7 +58,7 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
         )}
         <p className="text-base font-bold leading-tight line-clamp-2 break-words">{product.name}</p>
         <p className="text-base font-bold text-brand mt-1.5">{formatCurrency(product.price)}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">{product.stockQuantity} dona</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{product.stockQuantity} {getProductUnit(product.id)}</p>
         <div className="flex items-center gap-2 mt-auto pt-3">
           <button
             type="button"
@@ -175,7 +176,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-base leading-tight mb-1 break-words">{c.product.name}</p>
-                    <p className="text-sm text-muted-foreground">{formatCurrency(c.product.price)} / dona</p>
+                    <p className="text-sm text-muted-foreground">{formatCurrency(c.product.price)} / {getProductUnit(c.product.id)}</p>
                   </div>
                   <button
                     type="button"
@@ -273,7 +274,11 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
           </Form>
         </div>
 
-        <div className="shrink-0 bg-background border-t border-border/50 px-4 pt-4 pb-4 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] safe-area-bottom">
+        {/* A floating card held clear of the screen edge (like the nav dock),
+            not a bar welded to it: the confirm button used to sit flush against
+            the bottom, half under the thumb. One calc'd margin, not mb-6 +
+            safe-area-mb — both set margin-bottom, so one would silently lose. */}
+        <div className="shrink-0 bg-background border border-border/50 mx-3 mb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] px-4 py-4 rounded-3xl shadow-hover">
           {/* Jami and Chegirma only appear once there's a discount to explain —
               otherwise the payable line would just repeat the subtotal. */}
           {discount > 0 && (

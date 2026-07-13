@@ -40,6 +40,18 @@ export function monthStartStr(): string {
   return toDateStr(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
+// Spelled out by hand, not toLocaleDateString('uz-UZ') — WebView builds differ
+// on whether they ship the uz locale, and a shopkeeper must never see "July".
+const UZ_WEEKDAYS = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+const UZ_MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+
+/** A calendar date as the shopkeeper says it: "Dushanba, 14-iyul". */
+export function uzDayLabel(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${UZ_WEEKDAYS[d.getDay()]}, ${d.getDate()}-${UZ_MONTHS[d.getMonth()]}`;
+}
+
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '—';
   try {

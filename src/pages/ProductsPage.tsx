@@ -37,10 +37,16 @@ import {
   cn, formatCurrency, formatDateTime,
   getOutflowReasonLabel, getStockMovementTypeLabel
 } from '@/lib/utils';
+import {
+  UNITS, UNIT_LABELS, DEFAULT_UNIT, getProductUnit, setProductUnit, type Unit,
+} from '@/lib/units';
 
 // min-w-0 lets the value shrink instead of shoving the label; pl-2 keeps a long
 // value from touching the label; text stays right-aligned like a receipt.
-const ROW_INPUT_CLASS = 'flex-1 min-w-0 border-0 shadow-none text-right pl-2 p-0 h-auto text-sm font-semibold focus-visible:ring-0 bg-transparent';
+// Order matters: p-0 must come FIRST — tailwind-merge lets the later class win,
+// so `pl-2 p-0` killed the left padding, and with no right padding at all the
+// caret and the last typed letter sat clipped against the input's edge.
+const ROW_INPUT_CLASS = 'flex-1 min-w-0 border-0 shadow-none text-right p-0 pl-2 pr-1 h-auto text-sm font-semibold focus-visible:ring-0 bg-transparent';
 
 // A number field that shows nothing (not "0") when empty, so typing "50" gives
 // 50 — not "500", which is what a stuck leading zero produced. An emptied field
@@ -59,8 +65,9 @@ const OUTFLOW_REASONS: OutflowReason[] = ['DAMAGED', 'LOST', 'RETURNED'];
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 // The product record is { name, barcode?, purchasePrice, price, stockQuantity } —
-// there is no unit and no per-product minimum; "dona" below is just a UI word and
-// low stock is decided by the shared LOW_STOCK_THRESHOLD.
+// the server has no unit and no per-product minimum; the measure word ("dona",
+// "kg", …) is stored device-side (lib/units.ts) and low stock is decided by the
+// shared LOW_STOCK_THRESHOLD.
 const productSchema = z.object({
   name: z.string().min(1, 'Nom kiritilishi shart'),
   barcode: z.string().min(1, 'Shtrix-kod kiritilishi shart'),
@@ -103,6 +110,10 @@ function ProductDialog({
   onSaved: () => void;
 }) {
   const [scannerOpen, setScannerOpen] = useState(false);
+  // The unit lives outside the zod schema on purpose: the server's
+  // ProductRequest has no such field, so it is saved device-side after the
+  // API call succeeds (see lib/units.ts).
+  const [unit, setUnit] = useState<Unit>(DEFAULT_UNIT);
   const form = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: { name: '', barcode: '', purchasePrice: 0, price: 0, stockQuantity: 0 },
@@ -117,8 +128,10 @@ function ProductDialog({
         price: product.price,
         stockQuantity: product.stockQuantity,
       });
+      setUnit(getProductUnit(product.id));
     } else {
       form.reset({ name: '', barcode: '', purchasePrice: 0, price: 0, stockQuantity: 0 });
+      setUnit(DEFAULT_UNIT);
     }
   }, [product, open, form]);
 
@@ -130,9 +143,11 @@ function ProductDialog({
     try {
       if (product) {
         await productsApi.update(product.id, values);
+        setProductUnit(product.id, unit);
         notify.success('Mahsulot yangilandi');
       } else {
-        await productsApi.create(values);
+        const created = await productsApi.create(values);
+        setProductUnit(created.id, unit);
         notify.success('Mahsulot yaratildi');
       }
       onSaved();
@@ -200,7 +215,7 @@ function ProductDialog({
                 </FormItem>
               )} />
               <FormField control={form.control} name="stockQuantity" render={({ field }) => (
-                <FormItem className="space-y-0.5 px-4 py-3">
+                <FormItem className="space-y-0.5 px-4 py-3 border-b border-border/50">
                   <div className="flex items-center gap-3">
                     <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Ombordagi</FormLabel>
                     <FormControl>
@@ -210,10 +225,23 @@ function ProductDialog({
                   <FormMessage className="text-right" />
                 </FormItem>
               )} />
+              <div className="flex items-center gap-3 px-4 py-3">
+                <span className="shrink-0 text-sm font-medium text-muted-foreground w-28">O'lchov birligi</span>
+                <Select value={unit} onValueChange={v => setUnit(v as Unit)}>
+                  <SelectTrigger className="flex-1 min-w-0 justify-end gap-1.5 border-0 shadow-none bg-transparent p-0 h-auto text-sm font-semibold focus:ring-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    {UNITS.map(u => (
+                      <SelectItem key={u} value={u}>{UNIT_LABELS[u]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {sellPrice > 0 && (
               <div className="flex items-center justify-between px-4 py-3 mt-4 rounded-2xl bg-success/10 text-sm">
-                <span className="text-success font-medium">Bir dona foyda</span>
+                <span className="text-success font-medium">Bir {unit} foyda</span>
                 <span className={cn('font-bold', marginPct >= 0 ? 'text-success' : 'text-destructive')}>
                   {formatCurrency(sellPrice - purchasePrice)} ({marginPct}%)
                 </span>
@@ -266,7 +294,7 @@ function RestockDialog({
             <p className="text-muted-foreground text-sm mb-1">Mahsulot</p>
             <h3 className="font-bold text-lg">{product?.name}</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Hozirgi qoldiq: <span className="font-semibold text-foreground">{product?.stockQuantity} dona</span>
+              Hozirgi qoldiq: <span className="font-semibold text-foreground">{product ? `${product.stockQuantity} ${getProductUnit(product.id)}` : '—'}</span>
             </p>
           </div>
           <FormField control={form.control} name="quantity" render={({ field }) => (
@@ -300,7 +328,7 @@ function OutflowDialog({
   async function onSubmit(values: OutflowForm) {
     if (!product) return;
     if (values.quantity > product.stockQuantity) {
-      notify.error(`Ombordagi qoldiq: ${product.stockQuantity} dona`);
+      notify.error(`Ombordagi qoldiq: ${product.stockQuantity} ${getProductUnit(product.id)}`);
       return;
     }
     try {
@@ -318,7 +346,7 @@ function OutflowDialog({
             <p className="text-muted-foreground text-sm mb-1">Mahsulot</p>
             <h3 className="font-bold text-lg">{product?.name}</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Qoldiq: <span className="font-semibold text-foreground">{product?.stockQuantity} dona</span>
+              Qoldiq: <span className="font-semibold text-foreground">{product ? `${product.stockQuantity} ${getProductUnit(product.id)}` : '—'}</span>
             </p>
           </div>
           <FormField control={form.control} name="quantity" render={({ field }) => (
@@ -619,7 +647,7 @@ export default function ProductsPage() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground font-medium mb-2">
-                    Qoldiq: <span className="font-bold text-foreground">{p.stockQuantity} dona</span>
+                    Qoldiq: <span className="font-bold text-foreground">{p.stockQuantity} {getProductUnit(p.id)}</span>
                   </p>
                   {/* Five actions can't share a row with text on a 375px screen,
                       so they get their own full-width row of 44px targets. */}

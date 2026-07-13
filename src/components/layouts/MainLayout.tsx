@@ -233,10 +233,50 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <MobileOverlay open={open} onOpenChange={onClose} title="Ko'proq">
-      <div className="flex flex-col h-full bg-muted/10 p-4 space-y-4">
-        
-        {/* User Profile Card */}
-        <div className="bg-background rounded-3xl p-4 flex items-center justify-between shadow-sm border border-border/50">
+      {/* min-h-full + gap (not h-full + space-y): the profile card's mt-auto
+          must win to pin it to the bottom, and space-y's margins would not
+          let it; min-h-full lets the sheet still scroll when the grid is tall. */}
+      <div className="flex flex-col min-h-full bg-muted/10 p-4 gap-4">
+
+        {/* Menu Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          {visibleMoreItems.map(item => {
+            const isActive = isPathActive(location.pathname, item.path);
+            return (
+              <button
+                key={item.path}
+                type="button"
+                onClick={() => handleNav(item.path)}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 press',
+                  isActive ? 'bg-primary/10 text-primary border-primary/20 shadow-card' : 'bg-background text-foreground hover:bg-muted/50 shadow-card'
+                )}
+              >
+                <div className={cn(
+                  'h-12 w-12 rounded-2xl flex items-center justify-center',
+                  isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground'
+                )}>
+                  {React.cloneElement(item.icon as React.ReactElement<{ className?: string }>, { className: 'h-6 w-6' })}
+                </div>
+                <span className="text-xs font-bold text-center">{item.label}</span>
+              </button>
+            );
+          })}
+          
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 bg-background text-foreground hover:bg-muted/50 shadow-card press"
+          >
+            <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground">
+              {theme === 'dark' ? <Sun className="h-6 w-6 text-amber-400" /> : <Moon className="h-6 w-6" />}
+            </div>
+            <span className="text-xs font-bold text-center">Mavzu</span>
+          </button>
+        </div>
+
+        {/* User Profile Card — pinned to the bottom of the sheet */}
+        <div className="mt-auto bg-background rounded-3xl p-4 flex items-center justify-between shadow-card border border-border/50">
           <div className="flex items-center gap-3">
             <div className="h-14 w-14 rounded-full bg-gradient-primary flex items-center justify-center shadow-md shrink-0">
               <span className="text-2xl font-bold text-white">{user?.fullName?.[0]?.toUpperCase() ?? 'U'}</span>
@@ -255,43 +295,6 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
             className="h-12 w-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors press"
           >
             <LogOut className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Menu Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          {visibleMoreItems.map(item => {
-            const isActive = isPathActive(location.pathname, item.path);
-            return (
-              <button
-                key={item.path}
-                type="button"
-                onClick={() => handleNav(item.path)}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 press',
-                  isActive ? 'bg-primary/10 text-primary border-primary/20 shadow-sm' : 'bg-background text-foreground hover:bg-muted/50 shadow-sm'
-                )}
-              >
-                <div className={cn(
-                  'h-12 w-12 rounded-2xl flex items-center justify-center',
-                  isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground'
-                )}>
-                  {React.cloneElement(item.icon as React.ReactElement<{ className?: string }>, { className: 'h-6 w-6' })}
-                </div>
-                <span className="text-xs font-bold text-center">{item.label}</span>
-              </button>
-            );
-          })}
-          
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 bg-background text-foreground hover:bg-muted/50 shadow-sm press"
-          >
-            <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground">
-              {theme === 'dark' ? <Sun className="h-6 w-6 text-amber-400" /> : <Moon className="h-6 w-6" />}
-            </div>
-            <span className="text-xs font-bold text-center">Mavzu</span>
           </button>
         </div>
       </div>
@@ -378,7 +381,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
 export function PageHeader({
   title, description, action,
-}: { title: string; description?: string; action?: React.ReactNode }) {
+}: { title: string; description?: React.ReactNode; action?: React.ReactNode }) {
   const location = useLocation();
   const goBack = useGoBack();
   // The four bottom-nav tabs are reachable in one tap, so they need no back
