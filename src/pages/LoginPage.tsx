@@ -4,6 +4,7 @@ import { AlertCircle, Delete, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Logo } from '@/components/common/Logo';
 import { authApi } from '@/lib/api';
+import { homePathFor } from '@/routes';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -23,7 +24,7 @@ export default function LoginPage() {
 
   // ProtectedRoute stashes where the user was headed before it bounced them
   // here; going anywhere else would silently drop a deep link.
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/';
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? null;
 
   const submit = useCallback(async (value: string) => {
     setError('');
@@ -32,7 +33,9 @@ export default function LoginPage() {
       const res = await authApi.login({ pin: value });
       login(res);
       toast.success(`Xush kelibsiz, ${res.fullName}!`);
-      navigate(from, { replace: true });
+      // No deep link to honour: land on whatever "home" means for this role — a
+      // cashier has no dashboard, so sending them to "/" would only bounce.
+      navigate(from ?? homePathFor(res.role), { replace: true });
     } catch (err) {
       // request() already turns a dead network into an Uzbek sentence, so
       // whatever arrives here is safe to show as-is.

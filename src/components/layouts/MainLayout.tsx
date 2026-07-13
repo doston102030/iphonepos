@@ -23,49 +23,45 @@ interface NavItem {
   roles?: Role[];
 }
 
+// One list, role-tagged, and everything else is derived from it. There used to be
+// three hand-maintained copies (sidebar, bottom tabs, two "Ko'proq" lists) that
+// had already drifted: SMS and Sozlamalar existed in the sidebar but in neither
+// mobile menu, so on a phone they could not be opened at all.
+//
+// `roles` here must mirror routes.tsx — the route guard is what actually blocks;
+// this only decides what is worth showing.
 const navItems: NavItem[] = [
-  { label: 'Bosh sahifa', path: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { label: 'Bosh sahifa', path: '/', icon: <LayoutDashboard className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
   { label: 'Sotish', path: '/sell', icon: <ShoppingCart className="h-4 w-4" /> },
   { label: 'Mahsulotlar', path: '/products', icon: <Package className="h-4 w-4" /> },
   { label: 'Ombor', path: '/stock', icon: <Boxes className="h-4 w-4" /> },
-  { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" /> },
   { label: 'Qarzlar', path: '/debts', icon: <CreditCard className="h-4 w-4" /> },
-  { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
-  { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
+  { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
+  { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
+  { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
   { label: 'Foyda / Zarar', path: '/profit', icon: <TrendingUp className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
-  { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" /> },
+  { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
   { label: 'Foydalanuvchilar', path: '/users', icon: <Users className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
-  { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
+  { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
 ];
 
-// The "Ko'proq" tab is gone — Ombor took its slot. The same sheet still opens
-// from the avatar in the header, and it now carries SMS and Sozlamalar too,
-// which had no way in on a phone at all.
-const bottomTabs = [
-  { label: 'Bosh sahifa', path: '/', icon: LayoutDashboard },
+/** The bottom bar. A cashier has no dashboard, so they get four tabs, not five. */
+const bottomTabs: { label: string; path: string; icon: typeof LayoutDashboard; roles?: Role[] }[] = [
+  { label: 'Bosh sahifa', path: '/', icon: LayoutDashboard, roles: ['SUPER_ADMIN'] },
   { label: 'Sotish', path: '/sell', icon: ShoppingCart },
   { label: 'Mahsulotlar', path: '/products', icon: Package },
   { label: 'Ombor', path: '/stock', icon: Boxes },
   { label: 'Qarzlar', path: '/debts', icon: CreditCard },
 ];
 
-const cashierMoreItems: NavItem[] = [
-  { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" /> },
-  { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
-  { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
-  { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" /> },
-  { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
-];
+const TAB_PATHS = new Set(bottomTabs.map(t => t.path));
 
-const superAdminMoreItems: NavItem[] = [
-  { label: 'Buyurtmalar', path: '/orders', icon: <Receipt className="h-4 w-4" /> },
-  { label: 'Ombor harakatlari', path: '/stock-movements', icon: <Warehouse className="h-4 w-4" /> },
-  { label: 'Hisobotlar', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
-  { label: 'Foyda / Zarar', path: '/profit', icon: <TrendingUp className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
-  { label: 'Foydalanuvchilar', path: '/users', icon: <Users className="h-4 w-4" />, roles: ['SUPER_ADMIN'] },
-  { label: 'SMS', path: '/sms', icon: <MessageSquare className="h-4 w-4" /> },
-  { label: 'Sozlamalar', path: '/settings', icon: <Settings className="h-4 w-4" /> },
-];
+/** Everything that is not a tab — reached from the avatar in the header. */
+const moreItems: NavItem[] = navItems.filter(item => !TAB_PATHS.has(item.path));
+
+function visibleTo<T extends { roles?: Role[] }>(items: T[], role: Role | undefined): T[] {
+  return items.filter(item => !item.roles || (!!role && item.roles.includes(role)));
+}
 
 function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggleTheme } = useTheme();
@@ -97,9 +93,7 @@ function isPathActive(pathname: string, path: string): boolean {
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const { user } = useAuth();
-  const visibleItems = navItems.filter(
-    item => !item.roles || (!!user && item.roles.includes(user.role))
-  );
+  const visibleItems = visibleTo(navItems, user?.role);
 
   return (
     <nav className="flex-1 px-3 py-2 space-y-0.5">
@@ -174,6 +168,8 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
   cartCount: number; unpaidDebtsCount: number;
 }) {
   const location = useLocation();
+  const { user } = useAuth();
+  const tabs = visibleTo(bottomTabs, user?.role);
 
   const badgeFor = (path: string): number => {
     if (path === '/sell') return cartCount;
@@ -190,7 +186,7 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
     // --bottom-nav-h, which every page pads by.
     <nav className="absolute bottom-0 left-0 right-0 z-40 px-3 pointer-events-none nav-dock-inset">
       <div className="pointer-events-auto flex items-stretch h-[var(--dock-h)] rounded-full bg-background/70 backdrop-blur-2xl border border-border/60 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.22)] dark:shadow-[0_8px_28px_-6px_rgba(0,0,0,0.6)] px-1.5">
-        {bottomTabs.map(tab => {
+        {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = isPathActive(location.pathname, tab.path);
           const badge = badgeFor(tab.path);
@@ -228,12 +224,9 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const isCashier = user?.role === 'CASHIER';
-  const moreItems = isCashier
-    ? cashierMoreItems
-    : superAdminMoreItems.filter(
-        item => !item.roles || (!!user && item.roles.includes(user.role))
-      );
+  // A cashier's four pages are all bottom tabs, so this sheet holds nothing for
+  // them but their profile, the theme and the way out.
+  const visibleMoreItems = visibleTo(moreItems, user?.role);
 
   function handleLogout() { logout(); onClose(); navigate('/login'); }
   function handleNav(path: string) { navigate(path); onClose(); }
@@ -267,7 +260,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
         {/* Menu Grid */}
         <div className="grid grid-cols-2 gap-3">
-          {moreItems.map(item => {
+          {visibleMoreItems.map(item => {
             const isActive = isPathActive(location.pathname, item.path);
             return (
               <button

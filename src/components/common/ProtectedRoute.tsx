@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import type { Role } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Logo } from '@/components/common/Logo';
+import { homePathFor } from '@/routes';
 
 /** Shown for the moment it takes to verify a stored token against the server. */
 function BootSplash() {
@@ -32,19 +33,21 @@ export function ProtectedRoute({
   }
 
   if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
-    return <Navigate to="/" replace />;
+    // Home for a cashier is the till, not the dashboard — sending them to "/"
+    // would bounce them straight back here.
+    return <Navigate to={homePathFor(user?.role)} replace />;
   }
 
   return <>{children}</>;
 }
 
 export function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, booting } = useAuth();
+  const { isAuthenticated, booting, user } = useAuth();
 
   if (booting) return <BootSplash />;
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={homePathFor(user?.role)} replace />;
   }
 
   return <>{children}</>;
