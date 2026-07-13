@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import * as Sentry from '@sentry/react';
 import { authApi, type Role } from '@/lib/api';
 
 /** Exactly the shape of LoginResponse — the server sends nothing else. */
@@ -43,6 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('user');
     setUser(null);
   }, []);
+
+  // So a crash report says WHICH cashier hit it — otherwise every error is an
+  // anonymous "someone, somewhere". The token is never attached.
+  useEffect(() => {
+    if (user) Sentry.setUser({ id: String(user.id), username: user.fullName, role: user.role });
+    else Sentry.setUser(null);
+  }, [user]);
 
   useEffect(() => {
     const handleStorageChange = () => {

@@ -29,99 +29,114 @@
 }
 
 @layer base {
+  /* iOS system palette.
+     Two colours are deliberately NOT the literal Apple values: `brand` and
+     `success` are used as *text* on white (`text-brand` prices, `text-success`
+     totals), and Apple's #FF9500 / #34C759 land near 2:1 contrast there — legible
+     as a 44px fill, unreadable as 13px type. They are deepened in light mode and
+     restored to the true iOS hues in dark mode, where they sit on dark surfaces. */
   :root {
-    --radius: 0.5rem;
-    /* Swiss Grid × Enterprise SaaS - CRM palette */
-    --background: 30 6% 98%;
-    --foreground: 222 47% 8%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 8%;
+    /* The native UI face of each platform: SF Pro on iPhone/Mac, Roboto on
+       Android, Segoe on Windows. It is what makes the app read as "iOS" more
+       than any single colour does, and it costs no font download — the bundled
+       webfonts stay on only as a last-resort fallback. */
+    --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+      Roboto, system-ui, 'BeVietnamPro', sans-serif;
+    /* 10px: iOS control radius. Buttons/inputs/cards override upward from here. */
+    --radius: 0.625rem;
+    --background: 240 24% 96%;      /* systemGroupedBackground #F2F2F7 */
+    --foreground: 240 6% 10%;       /* label */
+    --card: 0 0% 100%;              /* secondarySystemGroupedBackground */
+    --card-foreground: 240 6% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 8%;
-    --primary: 258 84% 63%;
+    --popover-foreground: 240 6% 10%;
+    --primary: 211 100% 46%;        /* systemBlue, a shade deeper for 4.5:1 on white */
     --primary-foreground: 0 0% 100%;
-    --secondary: 258 90% 69%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 258 20% 95%;
-    --muted-foreground: 240 8% 46%;
+    /* `secondary` is a neutral chip/fill (iOS secondarySystemFill), not a second
+       brand colour — it carries dark text, so it must stay pale. */
+    --secondary: 240 20% 94%;
+    --secondary-foreground: 240 6% 15%;
+    --muted: 240 24% 96%;           /* systemGray6 */
+    --muted-foreground: 240 4% 45%; /* secondaryLabel */
     /* `accent` is the neutral hover/focus surface used by every shadcn control
        (ghost buttons, select items, menu items). It must stay low-contrast. */
-    --accent: 258 22% 94%;
-    --accent-foreground: 222 47% 8%;
-    /* `brand` is the amber highlight used for money/KPI emphasis. */
-    --brand: 38 92% 44%;
+    --accent: 240 20% 93%;
+    --accent-foreground: 240 6% 10%;
+    /* `brand` is the highlight used for money/KPI emphasis. */
+    --brand: 30 100% 36%;           /* systemOrange, deepened for text on white */
     --brand-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+    --destructive: 4 78% 50%;       /* systemRed, deepened */
     --destructive-foreground: 0 0% 100%;
-    --border: 258 15% 89%;
-    --input: 258 15% 89%;
-    --ring: 258 84% 63%;
-    --success: 142 71% 45%;
-    --warning: 38 92% 44%;
-    --info: 258 84% 63%;
-    --chart-1: 258 84% 63%;
-    --chart-2: 38 92% 44%;
-    --chart-3: 142 71% 45%;
-    --chart-4: 199 89% 55%;
-    --chart-5: 0 84% 60%;
-    --sidebar-background: 258 25% 97%;
-    --sidebar-foreground: 222 47% 8%;
-    --sidebar-primary: 258 84% 63%;
+    --border: 240 11% 91%;          /* systemGray5 */
+    --input: 240 11% 91%;
+    --ring: 211 100% 46%;
+    --success: 145 66% 32%;         /* systemGreen, deepened for text on white */
+    --warning: 30 100% 36%;
+    --info: 211 100% 46%;
+    --chart-1: 211 100% 46%;        /* blue */
+    --chart-2: 30 100% 45%;         /* orange */
+    --chart-3: 145 63% 38%;         /* green */
+    --chart-4: 199 93% 55%;         /* teal */
+    --chart-5: 340 82% 52%;         /* pink */
+    --sidebar-background: 240 24% 97%;
+    --sidebar-foreground: 240 6% 10%;
+    --sidebar-primary: 211 100% 46%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 258 25% 92%;
-    --sidebar-accent-foreground: 222 47% 8%;
-    --sidebar-border: 258 15% 89%;
-    --sidebar-ring: 258 84% 63%;
-    --shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-hover: 0 4px 12px rgba(0,0,0,0.10);
-    --gradient-primary: linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%);
-    --gradient-card: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
-    --gradient-background: linear-gradient(180deg, #fafaf9 0%, #f2f0ec 100%);
+    --sidebar-accent: 240 20% 93%;
+    --sidebar-accent-foreground: 240 6% 10%;
+    --sidebar-border: 240 11% 91%;
+    --sidebar-ring: 211 100% 46%;
+    /* iOS shadows are wide and faint, never a hard drop. */
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 6px 16px -6px rgba(0,0,0,0.08);
+    --shadow-hover: 0 2px 4px rgba(0,0,0,0.05), 0 12px 28px -8px rgba(0,0,0,0.14);
+    --gradient-primary: linear-gradient(135deg, #0073ED 0%, #34AADC 100%);
+    --gradient-card: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
+    --gradient-background: linear-gradient(180deg, #f7f7fa 0%, #f2f2f7 100%);
   }
 
   .dark {
-    --background: 258 20% 10%;
-    --foreground: 210 30% 94%;
-    --card: 258 20% 13%;
-    --card-foreground: 210 30% 94%;
-    --popover: 258 20% 13%;
-    --popover-foreground: 210 30% 94%;
-    --primary: 258 85% 68%;
+    --background: 240 6% 7%;
+    --foreground: 0 0% 98%;
+    --card: 240 5% 12%;             /* #1D1D1F, iOS elevated surface */
+    --card-foreground: 0 0% 98%;
+    --popover: 240 5% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 211 100% 52%;        /* systemBlue (dark) #0A84FF */
     --primary-foreground: 0 0% 100%;
-    --secondary: 258 80% 62%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 258 20% 18%;
-    --muted-foreground: 258 12% 65%;
-    --accent: 258 20% 20%;
-    --accent-foreground: 210 30% 94%;
-    --brand: 38 85% 52%;
-    --brand-foreground: 222 47% 8%;
-    --destructive: 0 62% 40%;
+    --secondary: 240 5% 20%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 4% 63%;
+    --accent: 240 5% 20%;
+    --accent-foreground: 0 0% 98%;
+    --brand: 37 100% 52%;           /* systemOrange (dark) #FF9F0A */
+    --brand-foreground: 240 6% 10%;
+    --destructive: 3 100% 61%;      /* systemRed (dark) #FF453A */
     --destructive-foreground: 0 0% 100%;
-    --border: 258 20% 22%;
-    --input: 258 20% 22%;
-    --ring: 258 85% 68%;
-    --success: 142 60% 40%;
-    --warning: 38 85% 48%;
-    --info: 258 85% 68%;
-    --chart-1: 258 85% 68%;
-    --chart-2: 38 85% 48%;
-    --chart-3: 142 60% 40%;
-    --chart-4: 199 85% 60%;
-    --chart-5: 0 62% 45%;
-    --sidebar-background: 258 20% 8%;
-    --sidebar-foreground: 210 30% 90%;
-    --sidebar-primary: 258 85% 68%;
+    --border: 240 5% 21%;
+    --input: 240 5% 21%;
+    --ring: 211 100% 52%;
+    --success: 135 64% 51%;         /* systemGreen (dark) #30D158 */
+    --warning: 37 100% 52%;
+    --info: 211 100% 52%;
+    --chart-1: 211 100% 52%;
+    --chart-2: 37 100% 52%;
+    --chart-3: 135 64% 51%;
+    --chart-4: 199 93% 67%;
+    --chart-5: 340 100% 64%;
+    --sidebar-background: 240 6% 5%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 211 100% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 258 20% 15%;
-    --sidebar-accent-foreground: 210 30% 90%;
-    --sidebar-border: 258 20% 18%;
-    --sidebar-ring: 258 85% 68%;
-    --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
-    --shadow-hover: 0 4px 12px rgba(0,0,0,0.4);
-    --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
-    --gradient-card: linear-gradient(180deg, hsl(258 20% 13%) 0%, hsl(258 20% 11%) 100%);
-    --gradient-background: linear-gradient(180deg, hsl(258 20% 10%) 0%, hsl(258 20% 8%) 100%);
+    --sidebar-accent: 240 5% 16%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 240 5% 18%;
+    --sidebar-ring: 211 100% 52%;
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.4), 0 6px 16px -6px rgba(0,0,0,0.5);
+    --shadow-hover: 0 2px 4px rgba(0,0,0,0.45), 0 12px 28px -8px rgba(0,0,0,0.6);
+    --gradient-primary: linear-gradient(135deg, #0A84FF 0%, #5AC8FA 100%);
+    --gradient-card: linear-gradient(180deg, hsl(240 5% 13%) 0%, hsl(240 5% 11%) 100%);
+    --gradient-background: linear-gradient(180deg, hsl(240 6% 8%) 0%, hsl(240 6% 6%) 100%);
   }
 }
 
@@ -149,7 +164,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'BeVietnamPro', system-ui, sans-serif;
+    font-family: var(--font-sans);
     font-size: 16px;
     line-height: 1.5;
     -webkit-tap-highlight-color: transparent;
@@ -159,10 +174,12 @@
     overscroll-behavior-y: none;
   }
 
+  /* iOS titles are tight and heavy, never loose. */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'HarmonyOSSans', 'BeVietnamPro', system-ui, sans-serif;
+    font-family: var(--font-sans);
     font-weight: 700;
     line-height: 1.25;
+    letter-spacing: -0.02em;
   }
 
   /* Native-app feel: no double-tap zoom delay, no accidental text selection
@@ -190,11 +207,13 @@
 
 @layer utilities {
   .kpi-number {
-    font-family: 'HarmonyOSSans', system-ui, sans-serif;
+    font-family: var(--font-sans);
     font-weight: 700;
     font-size: 1.5rem;
     line-height: 1.15;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
+    /* Digits keep a fixed width, so a ticking total doesn't jitter. */
+    font-variant-numeric: tabular-nums;
   }
   @media (min-width: 640px) {
     .kpi-number {
