@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Save } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Save, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,16 +41,25 @@ export default function SettingsPage() {
     themeRef.current = { darkMode, toggleTheme };
   });
 
-  useEffect(() => {
+  // If the GET fails, the form must NOT fall back to its defaults and stay
+  // editable: it would show "O'zbekcha" to a Russian-language user, and the
+  // first press of "Saqlash" would write that guess over their real setting.
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadFailed(false);
     settingsApi.get()
       .then(data => {
         setLanguage(toLanguage(data.language));
         // Apply the saved preference to the live theme.
         if (data.darkMode !== themeRef.current.darkMode) themeRef.current.toggleTheme();
       })
-      .catch(() => toast.error('Sozlamalar yuklanmadi'))
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   async function handleSave() {
     setSaving(true);
@@ -83,6 +92,17 @@ export default function SettingsPage() {
                   </div>
                 ))}
                 <Skeleton className="h-11 w-32" />
+              </div>
+            ) : loadFailed ? (
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
+                <p className="text-sm text-muted-foreground max-w-xs leading-snug">
+                  Sozlamalar yuklanmadi. Saqlangan qiymatlar noma'lum — shuning uchun
+                  forma ochilmadi, aks holda saqlash serverdagini o'chirib yuborardi.
+                </p>
+                <Button variant="outline" className="h-11 press" onClick={load}>
+                  Qayta urinish
+                </Button>
               </div>
             ) : (
               <div className="space-y-5">

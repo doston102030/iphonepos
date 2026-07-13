@@ -184,7 +184,7 @@ export default function OrdersPage() {
             <div className="space-y-1">
               {(viewOrder.items ?? []).map((item, i) => (
                 <div key={i} className="flex justify-between text-sm gap-3">
-                  <span className="min-w-0">{item.productName} × {item.quantity}</span>
+                  <span className="min-w-0 break-words">{item.productName} × {item.quantity}</span>
                   <span className="font-medium shrink-0">{formatCurrency(item.unitPrice * item.quantity)}</span>
                 </div>
               ))}

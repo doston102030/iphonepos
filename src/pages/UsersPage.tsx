@@ -144,15 +144,24 @@ export default function UsersPage() {
   const { isSuperAdmin, user: currentUser } = useAuth();
   const isMobile = useIsMobile();
 
-  // The server identifies a user by fullName — there is no username to compare.
-  const isSelf = (u: UserResponse) => !!currentUser && u.fullName === currentUser.fullName;
+  // By id, not by name: two employees can share a full name, and comparing names
+  // then disabled delete/deactivate on the wrong row — while leaving the real
+  // self-protection off.
+  const isSelf = (u: UserResponse) => !!currentUser && u.id === currentUser.id;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await usersApi.getAll(page, 20);
-      setUsers(extractContent(res));
       const pg = extractPage(res);
+      // Deleting the last row of the last page leaves `page` past the end, and
+      // the refetch then returns nothing — the admin sees an empty list and a
+      // "3 / 2" counter. Step back instead.
+      if (page > 0 && page > pg.totalPages - 1) {
+        setPage(Math.max(0, pg.totalPages - 1));
+        return;
+      }
+      setUsers(extractContent(res));
       setTotalPages(pg.totalPages);
       setTotalElements(pg.totalElements);
     } catch { toast.error('Foydalanuvchilar yuklanmadi'); }

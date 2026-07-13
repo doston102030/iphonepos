@@ -1,36 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShoppingCart, Package, CreditCard, TrendingUp,
-  Warehouse, Wallet, TrendingDown, Percent, Trophy,
+  Warehouse, Wallet, TrendingDown, Percent, Trophy, AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import {
   reportsApi, ordersApi, inventorySummary, marginPct,
   type SalesReportResponse, type OrderResponse, type PaymentMethod,
   extractContent,
 } from '@/lib/api';
-import { cn, formatCurrency, formatDateTime, getPaymentMethodLabel } from '@/lib/utils';
+import {
+  cn, formatCurrency, formatDateTime, getPaymentMethodLabel,
+  todayStr, daysAgoStr, monthStartStr,
+} from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 /** What inventorySummary() can actually derive — no inventory value exists. */
 interface InventoryStats { totalProducts: number; lowStockCount: number }
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-function daysAgoStr(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
-}
-function monthStartStr(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
-}
 
 function KpiCard({
   title, value, sub, icon, tone = 'default',
@@ -81,22 +73,35 @@ export default function DashboardPage() {
   const [week, setWeek] = useState<SalesReportResponse | null>(null);
   const [month, setMonth] = useState<SalesReportResponse | null>(null);
   const [inventory, setInventory] = useState<InventoryStats | null>(null);
-  const [recentOrders, setRecentOrders] = useState<OrderResponse[]>([]);
+  const [recentOrders, setRecentOrders] = useState<OrderResponse[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const { user, isSuperAdmin } = useAuth();
 
-  useEffect(() => {
-    Promise.all([
+  // allSettled, not all: one dead endpoint used to reject the whole batch, and
+  // the `.catch(() => null)` under it left every card rendering a confident 0 —
+  // a cashier could not tell "sotuv bo'lmadi" from "server javob bermadi".
+  // Whatever does load is shown; whatever fails shows "—" and says so.
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [d, w, m, inv, ord] = await Promise.allSettled([
       reportsApi.daily(),
       reportsApi.range(daysAgoStr(6), todayStr()),
       reportsApi.range(monthStartStr(), todayStr()),
       inventorySummary(),
       ordersApi.getAll(0, 5),
-    ]).then(([d, w, m, inv, ordersRes]) => {
-      setToday(d); setWeek(w); setMonth(m); setInventory(inv);
-      setRecentOrders(extractContent(ordersRes));
-    }).catch(() => null).finally(() => setLoading(false));
+    ]);
+
+    setToday(d.status === 'fulfilled' ? d.value : null);
+    setWeek(w.status === 'fulfilled' ? w.value : null);
+    setMonth(m.status === 'fulfilled' ? m.value : null);
+    setInventory(inv.status === 'fulfilled' ? inv.value : null);
+    setRecentOrders(ord.status === 'fulfilled' ? extractContent(ord.value) : null);
+    setFailed([d, w, m, inv, ord].some(r => r.status === 'rejected'));
+    setLoading(false);
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   // Revenue is not split by cash vs card, but the credit portion IS reported —
   // so the only honest split is "paid up front" vs "sold on credit".
@@ -115,13 +120,25 @@ export default function DashboardPage() {
           description="Bugungi savdo ko'rsatkichlari"
         />
 
+        {failed && !loading && (
+          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+            <p className="flex-1 text-sm text-destructive font-medium leading-snug">
+              Ba'zi ma'lumotlar yuklanmadi — "—" belgisi noldan emas, xatodan.
+            </p>
+            <Button size="sm" variant="outline" className="shrink-0 press" onClick={load}>
+              Qayta urinish
+            </Button>
+          </div>
+        )}
+
         {loading ? (
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="shadow-card">
-                <CardContent className="p-4">
+              <Card key={i} className="shadow-card rounded-2xl">
+                <CardContent className="p-4 md:p-5">
                   <Skeleton className="h-4 w-20 mb-3" />
-                  <Skeleton className="h-6 w-24" />
+                  <Skeleton className="h-7 w-24" />
                 </CardContent>
               </Card>
             ))}
@@ -130,24 +147,24 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
             <KpiCard
               title="Bugungi savdo"
-              value={formatCurrency(todayRevenue)}
+              value={today ? formatCurrency(todayRevenue) : '—'}
               icon={<Wallet className="h-4 w-4" />}
               tone="brand"
             />
             <KpiCard
               title="Bugungi foyda"
-              value={formatCurrency(today?.totalProfit ?? 0)}
+              value={today ? formatCurrency(today.totalProfit) : '—'}
               icon={<TrendingUp className="h-4 w-4" />}
               tone={(today?.totalProfit ?? 0) >= 0 ? 'success' : 'destructive'}
             />
             <KpiCard
               title="Buyurtmalar"
-              value={String(today?.totalOrders ?? 0)}
+              value={today ? String(today.totalOrders) : '—'}
               icon={<ShoppingCart className="h-4 w-4" />}
             />
             <KpiCard
               title="Marja"
-              value={`${today ? marginPct(today) : 0}%`}
+              value={today ? `${marginPct(today)}%` : '—'}
               icon={<Percent className="h-4 w-4" />}
               tone={today && marginPct(today) >= 0 ? 'success' : 'destructive'}
             />
@@ -162,6 +179,8 @@ export default function DashboardPage() {
             <CardContent className="space-y-3">
               {loading ? (
                 <Skeleton className="h-20 w-full" />
+              ) : !today ? (
+                <p className="text-sm text-muted-foreground py-2">Ma'lumot yuklanmadi</p>
               ) : (
                 [
                   { label: "To'langan", value: todayPaid, color: 'bg-success' },
@@ -200,12 +219,12 @@ export default function DashboardPage() {
                 <>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Mahsulotlar</span>
-                    <span className="font-semibold">{inventory?.totalProducts ?? 0} dona</span>
+                    <span className="font-semibold">{inventory ? `${inventory.totalProducts} ta` : '—'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Kam qolgan</span>
                     <span className={cn('font-semibold', (inventory?.lowStockCount ?? 0) > 0 && 'text-destructive')}>
-                      {inventory?.lowStockCount ?? 0}
+                      {inventory ? inventory.lowStockCount : '—'}
                     </span>
                   </div>
                   <Link to="/products" className="inline-flex items-center min-h-11 text-xs text-primary font-medium press">
@@ -223,9 +242,9 @@ export default function DashboardPage() {
             <CardContent>
               {loading ? <Skeleton className="h-12 w-full" /> : (
                 <div className="grid grid-cols-3 gap-2">
-                  <MiniStat label="Savdo" value={formatCurrency(week?.totalRevenue ?? 0)} />
-                  <MiniStat label="Foyda" value={formatCurrency(week?.totalProfit ?? 0)} />
-                  <MiniStat label="Buyurtma" value={String(week?.totalOrders ?? 0)} />
+                  <MiniStat label="Savdo" value={week ? formatCurrency(week.totalRevenue) : '—'} />
+                  <MiniStat label="Foyda" value={week ? formatCurrency(week.totalProfit) : '—'} />
+                  <MiniStat label="Buyurtma" value={week ? String(week.totalOrders) : '—'} />
                 </div>
               )}
             </CardContent>
@@ -235,9 +254,9 @@ export default function DashboardPage() {
             <CardContent>
               {loading ? <Skeleton className="h-12 w-full" /> : (
                 <div className="grid grid-cols-3 gap-2">
-                  <MiniStat label="Savdo" value={formatCurrency(month?.totalRevenue ?? 0)} />
-                  <MiniStat label="Foyda" value={formatCurrency(month?.totalProfit ?? 0)} />
-                  <MiniStat label="Buyurtma" value={String(month?.totalOrders ?? 0)} />
+                  <MiniStat label="Savdo" value={month ? formatCurrency(month.totalRevenue) : '—'} />
+                  <MiniStat label="Foyda" value={month ? formatCurrency(month.totalProfit) : '—'} />
+                  <MiniStat label="Buyurtma" value={month ? String(month.totalOrders) : '—'} />
                 </div>
               )}
             </CardContent>
@@ -308,6 +327,8 @@ export default function DashboardPage() {
               <div className="p-4 space-y-2">
                 {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
+            ) : !recentOrders ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">Yuklanmadi</p>
             ) : recentOrders.length === 0 ? (
               <p className="text-center py-8 text-muted-foreground text-sm">Buyurtma yo'q</p>
             ) : (

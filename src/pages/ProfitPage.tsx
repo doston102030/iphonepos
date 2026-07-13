@@ -16,19 +16,12 @@ import {
   reportsApi, totalCost, marginPct,
   type SalesReportResponse, type DailySalesResponse,
 } from '@/lib/api';
-import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import {
+  formatCurrency, formatDate, cn, todayStr, daysAgoStr,
+} from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-function daysAgoStr(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
-}
 
 type Period = 'today' | 'week' | 'month' | 'range';
 

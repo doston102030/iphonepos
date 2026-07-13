@@ -36,8 +36,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems(prev => prev.filter(c => c.product.id !== productId));
   }, []);
 
+  // Same stock ceiling as addItem — without it, any "+" wired to this function
+  // would happily sell more than the shelf holds.
   const incrementItem = useCallback((productId: number) => {
-    setItems(prev => prev.map(c => c.product.id === productId ? { ...c, quantity: c.quantity + 1 } : c));
+    setItems(prev => prev.map(c =>
+      c.product.id === productId && c.quantity < c.product.stockQuantity
+        ? { ...c, quantity: c.quantity + 1 }
+        : c
+    ));
   }, []);
 
   const decrementItem = useCallback((productId: number) => {

@@ -15,20 +15,17 @@ import {
   reportsApi, totalCost, marginPct,
   type SalesReportResponse, type DailySalesResponse, type UserSalesResponse
 } from '@/lib/api';
-import { formatCurrency, formatDate, getRoleLabel } from '@/lib/utils';
+import {
+  formatCurrency, formatDate, getRoleLabel, todayStr, daysAgoStr,
+} from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-function weekAgo(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 7);
-  return d.toISOString().slice(0, 10);
-}
+// Dates come from lib/utils so they follow the shop's calendar, not UTC's.
+const today = todayStr;
+const weekAgo = () => daysAgoStr(7);
 
 // ── KPI summary card ──────────────────────────────────────────────────────────
 // Only what the server actually reports (plus the two values derivable from it):
@@ -63,7 +60,10 @@ function SummaryCard({ data, loading }: { data: SalesReportResponse | null; load
         <Card key={item.label} className="shadow-card">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-            <p className="text-lg font-bold text-foreground">{item.value}</p>
+            {/* uz-UZ groups thousands with a non-breaking space, so "150 000 000
+                so'm" is one unbreakable token — without this it ran past the
+                card's edge into the next one on a phone. */}
+            <p className="text-lg font-bold text-foreground break-words">{item.value}</p>
           </CardContent>
         </Card>
       ))}

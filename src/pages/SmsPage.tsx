@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Send, MessageSquare, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -110,20 +110,25 @@ export default function SmsPage() {
   const [sendOpen, setSendOpen] = useState(false);
   const isMobile = useIsMobile();
 
-  async function loadData() {
+  // Separately settled: /api/sms/balance answers 501 until the Eskiz integration
+  // is wired up (see api.ts), and Promise.all let that failure throw away the
+  // campaign list that had loaded perfectly well — the page then claimed there
+  // were no campaigns at all.
+  const loadData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [c, b] = await Promise.all([
-        smsApi.getCampaigns(),
-        smsApi.getBalance(),
-      ]);
-      setCampaigns(extractContent(c));
-      setBalance(b);
-    } catch { toast.error('Ma\'lumotlar yuklanmadi'); }
-    finally { setLoading(false); }
-  }
+    const [c, b] = await Promise.allSettled([
+      smsApi.getCampaigns(),
+      smsApi.getBalance(),
+    ]);
 
-  useEffect(() => { loadData(); }, []);
+    if (c.status === 'fulfilled') setCampaigns(extractContent(c.value));
+    else toast.error('Kampaniyalar yuklanmadi');
+
+    setBalance(b.status === 'fulfilled' ? b.value : null);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   return (
     <MainLayout>

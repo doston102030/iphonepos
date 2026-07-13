@@ -505,8 +505,15 @@ export default function ProductsPage() {
     setLoading(true);
     try {
       const res = await productsApi.getAll(search || undefined, page, 30);
-      setProducts(extractContent(res));
       const pg = extractPage(res);
+      // Deleting the last product on the last page leaves `page` past the end;
+      // the refetch then comes back empty and the screen reads "Mahsulot
+      // topilmadi" over a "3 / 2" counter, as if the catalogue had vanished.
+      if (page > 0 && page > pg.totalPages - 1) {
+        setPage(Math.max(0, pg.totalPages - 1));
+        return;
+      }
+      setProducts(extractContent(res));
       setTotalPages(pg.totalPages);
       setTotalElements(pg.totalElements);
     } catch {

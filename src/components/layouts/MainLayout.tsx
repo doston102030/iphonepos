@@ -3,8 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ShoppingCart, CreditCard, Warehouse,
   BarChart3, MessageSquare, Settings, Users, LogOut,
-  ChevronRight, Sun, Moon, MoreHorizontal, TrendingUp, Receipt,
+  ChevronRight, ChevronLeft, Sun, Moon, MoreHorizontal, TrendingUp, Receipt,
 } from 'lucide-react';
+import useGoBack from '@/hooks/use-go-back';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/common/Logo';
@@ -356,8 +357,25 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 export function PageHeader({
   title, description, action,
 }: { title: string; description?: string; action?: React.ReactNode }) {
+  const location = useLocation();
+  const goBack = useGoBack();
+  // The four bottom-nav tabs are reachable in one tap, so they need no back
+  // button. Every other page is opened from the "Ko'proq" sheet — without this
+  // the only way out is the bottom nav, which loses where you came from.
+  const isTabRoot = bottomTabs.some(tab => tab.path === location.pathname);
+
   return (
-    <div className="flex items-start justify-between gap-3 mb-4 md:mb-6">
+    <div className="flex items-start gap-3 mb-4 md:mb-6">
+      {!isTabRoot && (
+        <button
+          type="button"
+          aria-label="Orqaga"
+          onClick={goBack}
+          className="md:hidden h-10 w-10 -ml-1 mt-0.5 shrink-0 rounded-xl bg-muted text-foreground flex items-center justify-center press"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+      )}
       <div className="flex-1 min-w-0">
         <h1 className="text-[22px] leading-tight font-bold text-foreground tracking-tight md:text-2xl">{title}</h1>
         {description && (

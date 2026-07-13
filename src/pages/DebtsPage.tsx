@@ -297,12 +297,30 @@ const STATUS_TABS: { value: DebtStatus; label: string }[] = [
   { value: 'PAID', label: "To'langan" },
 ];
 
+const PAGE_SIZE = 20;
+
+/**
+ * GET /api/debts takes only page & size — it cannot filter by status and cannot
+ * search by name. So the tabs and the search box are only honest if every debt
+ * is in memory: paging the server and then filtering the 20 rows that came back
+ * made the "To'lanmagan" tab report "Qarz topilmadi" while unpaid debts sat on
+ * page 2, and made a customer on page 3 unfindable by name. Filtering and
+ * paging therefore both happen here, over the full list.
+ */
+async function fetchAllDebts(): Promise<DebtResponse[]> {
+  const first = await debtsApi.getAll(0, 100);
+  const all = extractContent(first);
+  const { totalPages } = extractPage(first);
+  for (let p = 1; p < totalPages; p++) {
+    all.push(...extractContent(await debtsApi.getAll(p, 100)));
+  }
+  return all;
+}
+
 export default function DebtsPage() {
   const [debts, setDebts] = useState<DebtResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
   const [editDebt, setEditDebt] = useState<DebtResponse | null>(null);
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [payDebt, setPayDebt] = useState<DebtResponse | null>(null);
@@ -317,17 +335,15 @@ export default function DebtsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await debtsApi.getAll(page, 20);
-      setDebts(extractContent(res));
-      const pg = extractPage(res);
-      setTotalPages(pg.totalPages);
-      setTotalElements(pg.totalElements);
+      setDebts(await fetchAllDebts());
     } catch { toast.error('Qarzlar yuklanmadi'); }
     finally { setLoading(false); }
-  }, [page]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  // Every debt is loaded, so this really is the shop's outstanding total — it
+  // used to be the subtotal of whichever page you were looking at.
   const totalDebt = useMemo(() => debts.reduce((s, d) => s + remainingAmount(d), 0), [debts]);
 
   const filteredDebts = useMemo(() => {
@@ -338,6 +354,17 @@ export default function DebtsPage() {
       return d.customerName.toLowerCase().includes(q) || (d.phone ?? '').includes(q);
     });
   }, [debts, statusFilter, search]);
+
+  // A new filter, a new search or a delete can leave `page` past the end of the
+  // list; clamping here keeps the list and the page counter from disagreeing.
+  const totalPages = Math.max(1, Math.ceil(filteredDebts.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pagedDebts = useMemo(
+    () => filteredDebts.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [filteredDebts, safePage],
+  );
+
+  useEffect(() => { setPage(0); }, [statusFilter, search]);
 
   async function handleDelete() {
     if (!deleteId) return;
@@ -407,9 +434,9 @@ export default function DebtsPage() {
               Array.from({ length: 5 }).map((_, i) => (
                 <Card key={i} className="shadow-sm"><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
               ))
-            ) : filteredDebts.length === 0 ? (
+            ) : pagedDebts.length === 0 ? (
               <p className="text-center py-8 text-muted-foreground text-sm">Qarz topilmadi</p>
-            ) : filteredDebts.map(d => {
+            ) : pagedDebts.map(d => {
               const paidPct = d.amount > 0 ? Math.round((d.paidAmount / d.amount) * 100) : 0;
               const remaining = remainingAmount(d);
               return (
@@ -472,8 +499,8 @@ export default function DebtsPage() {
           </div>
           <div className="py-2">
             <PaginationControls
-              page={page} totalPages={totalPages}
-              totalElements={totalElements} size={20}
+              page={safePage} totalPages={totalPages}
+              totalElements={filteredDebts.length} size={PAGE_SIZE}
               onPageChange={setPage}
             />
           </div>
@@ -504,13 +531,13 @@ export default function DebtsPage() {
                           ))}
                         </TableRow>
                       ))
-                    ) : filteredDebts.length === 0 ? (
+                    ) : pagedDebts.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-sm">
                           Qarz topilmadi
                         </TableCell>
                       </TableRow>
-                    ) : filteredDebts.map(d => (
+                    ) : pagedDebts.map(d => (
                       <TableRow key={d.id}>
                         <TableCell className="whitespace-nowrap font-medium">{d.customerName}</TableCell>
                         <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{d.phone ?? '—'}</TableCell>
@@ -550,8 +577,8 @@ export default function DebtsPage() {
               </div>
               <div className="px-4 pb-3">
                 <PaginationControls
-                  page={page} totalPages={totalPages}
-                  totalElements={totalElements} size={20}
+                  page={safePage} totalPages={totalPages}
+                  totalElements={filteredDebts.length} size={PAGE_SIZE}
                   onPageChange={setPage}
                 />
               </div>
