@@ -13,3 +13,6 @@ historical_context.txt
 
 .DS_Store
 *.log
+
+.vercel
+.env*

@@ -5,10 +5,15 @@
 // commented as such) — never invented. If a number cannot be derived, it is not
 // exposed, so no screen can quietly render a fake zero.
 //
-// In dev, /api goes through the vite proxy (see vite.config.ts), so BASE_URL is
-// relative. In production the app talks to the backend directly.
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? '' : 'https://api.netdc.uz');
+// BASE_URL stays relative in BOTH dev and production, because the browser must
+// never call api.netdc.uz directly: the backend rejects cross-origin preflights
+// (OPTIONS from another origin returns 403 with no Access-Control-Allow-Origin),
+// so a direct call would fail CORS on every request.
+// Instead /api is proxied server-side — by vite in dev (vite.config.ts) and by a
+// rewrite in production (vercel.json) — which keeps every request same-origin.
+// Set VITE_API_BASE_URL only if you host somewhere without such a proxy AND the
+// backend has whitelisted that origin.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 import {
