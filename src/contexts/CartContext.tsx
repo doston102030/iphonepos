@@ -9,6 +9,8 @@ interface CartContextValue {
   addItem: (product: ProductResponse) => void;
   incrementItem: (productId: number) => void;
   decrementItem: (productId: number) => void;
+  /** Typed-in amount: clamped to [1, stock] and floored to a whole number. */
+  setItemQuantity: (productId: number, quantity: number) => void;
   removeItem: (productId: number) => void;
   clear: () => void;
   totalCount: number;
@@ -94,6 +96,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // The server's OrderItemRequest.quantity is int32, so whatever the cashier
+  // types — including a sum converted to kg — lands on a whole number, capped
+  // by the same stock ceiling as addItem. Zero doesn't remove the row (the
+  // trash button does that); it just holds the line at 1 while they retype.
+  const setItemQuantity = useCallback((productId: number, quantity: number) => {
+    if (!Number.isFinite(quantity)) return;
+    setItems(prev => prev.map(c =>
+      c.product.id === productId
+        ? { ...c, quantity: Math.min(Math.max(1, Math.floor(quantity)), c.product.stockQuantity) }
+        : c
+    ));
+  }, []);
+
   const clear = useCallback(() => setItems([]), []);
 
   const totalCount = useMemo(() => items.reduce((s, c) => s + c.quantity, 0), [items]);
@@ -104,7 +119,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value: CartContextValue = {
-    items, addItem, incrementItem, decrementItem, removeItem, clear, totalCount, totalPrice, quantityOf,
+    items, addItem, incrementItem, decrementItem, setItemQuantity, removeItem, clear,
+    totalCount, totalPrice, quantityOf,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

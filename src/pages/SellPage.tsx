@@ -14,13 +14,17 @@ import {
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
-import { useCart } from '@/contexts/CartContext';
+import { useCart, type CartItem } from '@/contexts/CartContext';
 import {
   productsApi, ordersApi, fetchAllPages, newIdempotencyKey, type ProductResponse,
 } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getProductUnit } from '@/lib/units';
 import { notify } from '@/lib/notify';
+
+// Units sold by measure, not by count: for these the cart also takes a target
+// SUM — "2000 so'mlik bering" — and works the quantity out itself.
+const MEASURED_UNITS = new Set(['kg', 'gramm', 'litr', 'ml']);
 
 // The API's paymentMethod also allows MIXED, but that needs a paidAmount split
 // this screen does not collect — so it is not offered here.
@@ -84,10 +88,112 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
   );
 }
 
+/**
+ * One basket line. The quantity itself is typeable, and for measured units
+ * (kg, litr, …) there is a second field that takes the TARGET SUM — the shop
+ * counter workflow where the customer asks for "2000 so'mlik" of something.
+ * The server only accepts whole quantities, so the sum is rounded to the
+ * nearest whole kg/litr and the line total always shows the real charge.
+ */
+function CartItemRow({ item }: { item: CartItem }) {
+  const { addItem, decrementItem, removeItem, setItemQuantity } = useCart();
+  const { product, quantity } = item;
+  const unit = getProductUnit(product.id);
+  const measured = MEASURED_UNITS.has(unit);
+  // null = mirror the cart; a string while the cashier is mid-type, so typing
+  // "27" isn't clamped/normalized after the first keystroke.
+  const [qtyDraft, setQtyDraft] = useState<string | null>(null);
+  const [sumDraft, setSumDraft] = useState<string | null>(null);
+
+  function applyQty(raw: string) {
+    const n = Number(raw);
+    if (raw !== '' && Number.isFinite(n)) setItemQuantity(product.id, n);
+  }
+  function applySum(raw: string) {
+    const n = Number(raw);
+    if (raw !== '' && Number.isFinite(n) && product.price > 0) {
+      setItemQuantity(product.id, Math.round(n / product.price));
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 p-3 rounded-2xl bg-muted/20">
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-base leading-tight mb-1 break-words">{product.name}</p>
+          <p className="text-sm text-muted-foreground">{formatCurrency(product.price)} / {unit}</p>
+        </div>
+        <button
+          type="button"
+          aria-label="O'chirish"
+          onClick={() => removeItem(product.id)}
+          className="h-10 w-10 -mt-1 -mr-1 shrink-0 flex items-center justify-center text-muted-foreground hover:text-destructive rounded-xl transition-colors press"
+        >
+          <Trash2 className="h-5 w-5" />
+        </button>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-bold text-lg text-primary min-w-0 truncate">{formatCurrency(product.price * quantity)}</p>
+        <div className="flex items-center gap-1 bg-background rounded-xl p-1 shadow-sm border border-border/50 shrink-0">
+          <button
+            type="button"
+            aria-label="Kamaytirish"
+            onClick={() => { setQtyDraft(null); setSumDraft(null); decrementItem(product.id); }}
+            className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-foreground press"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            aria-label="Miqdor"
+            className="w-14 h-10 text-center font-bold text-base tabular-nums bg-transparent outline-none rounded-lg focus:bg-muted/50"
+            value={qtyDraft ?? String(quantity)}
+            onFocus={e => e.target.select()}
+            onChange={e => { setQtyDraft(e.target.value); setSumDraft(null); applyQty(e.target.value); }}
+            onBlur={() => setQtyDraft(null)}
+          />
+          <button
+            type="button"
+            aria-label="Qo'shish"
+            disabled={quantity >= product.stockQuantity}
+            onClick={() => { setQtyDraft(null); setSumDraft(null); addItem(product); }}
+            className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center disabled:opacity-30 press"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      {measured && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground shrink-0">Summa bilan:</span>
+          <div className="relative flex-1 min-w-0">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              aria-label="Summa bilan"
+              placeholder="0"
+              className="w-full h-10 rounded-xl bg-background border border-border/50 pl-3 pr-12 text-sm font-semibold text-right outline-none focus:border-primary"
+              value={sumDraft ?? String(product.price * quantity)}
+              onFocus={e => e.target.select()}
+              onChange={e => { setSumDraft(e.target.value); setQtyDraft(null); applySum(e.target.value); }}
+              onBlur={() => setSumDraft(null)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">so'm</span>
+          </div>
+          <span className="text-sm font-bold shrink-0 tabular-nums">= {quantity} {unit}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CheckoutSheet({ open, onOpenChange, onCompleted }: {
   open: boolean; onOpenChange: (v: boolean) => void; onCompleted: () => void;
 }) {
-  const { items, totalPrice, clear, addItem, decrementItem, removeItem } = useCart();
+  const { items, totalPrice, clear } = useCart();
   const form = useForm<CheckoutForm>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: { paymentMethod: 'CASH', customerName: '', customerPhone: '' },
@@ -171,47 +277,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
                 <ShoppingCart className="h-12 w-12 mb-3" />
                 <p>Savatcha bo'sh</p>
               </div>
-            ) : items.map(c => (
-              <div key={c.product.id} className="flex flex-col gap-3 p-3 rounded-2xl bg-muted/20">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-base leading-tight mb-1 break-words">{c.product.name}</p>
-                    <p className="text-sm text-muted-foreground">{formatCurrency(c.product.price)} / {getProductUnit(c.product.id)}</p>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="O'chirish"
-                    onClick={() => removeItem(c.product.id)}
-                    className="h-10 w-10 -mt-1 -mr-1 shrink-0 flex items-center justify-center text-muted-foreground hover:text-destructive rounded-xl transition-colors press"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-bold text-lg text-primary min-w-0 truncate">{formatCurrency(c.product.price * c.quantity)}</p>
-                  <div className="flex items-center gap-2 bg-background rounded-xl p-1 shadow-sm border border-border/50 shrink-0">
-                    <button
-                      type="button"
-                      aria-label="Kamaytirish"
-                      onClick={() => decrementItem(c.product.id)}
-                      className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-foreground press"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <span className="w-7 text-center font-bold text-base tabular-nums">{c.quantity}</span>
-                    <button
-                      type="button"
-                      aria-label="Qo'shish"
-                      disabled={c.quantity >= c.product.stockQuantity}
-                      onClick={() => addItem(c.product)}
-                      className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center disabled:opacity-30 press"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+            ) : items.map(c => <CartItemRow key={c.product.id} item={c} />)}
           </div>
 
           <Form {...form}>

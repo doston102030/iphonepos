@@ -562,10 +562,16 @@ export default function ProductsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function handleSearch() {
-    setSearch(searchInput);
-    setPage(0);
-  }
+  // Search follows the keystrokes (debounced), the same way the sell screen
+  // does — the "Qidirish" button made the cashier type and then go hunting
+  // for a button that the till never needed.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   async function handleDelete() {
     if (!deleteId) return;
@@ -600,19 +606,15 @@ export default function ProductsPage() {
           }
         />
 
-        {/* Search */}
-        <div className="flex gap-2 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Mahsulot qidirish..."
-              className="pl-9 h-12 rounded-xl md:h-9"
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            />
-          </div>
-          <Button variant="outline" className="h-12 rounded-xl md:h-9 shrink-0" onClick={handleSearch}>Qidirish</Button>
+        {/* Search — live, no button: results update as the name is typed. */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Mahsulot qidirish..."
+            className="pl-9 h-12 rounded-xl md:h-9"
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+          />
         </div>
 
         {isMobile ? (
