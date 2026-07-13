@@ -37,13 +37,15 @@ export const routes: RouteConfig[] = [
   { name: 'Login', path: '/login', element: <LoginPage />, public: true },
   { name: 'Dashboard', path: '/', element: <DashboardPage />, roles: ['SUPER_ADMIN'] },
 
-  // The cashier's four:
+  // The cashier's own work — selling, stocking, debts, and the receipts they rang
+  // up (GET /api/orders is not filtered by cashier, so they see the shop's, not
+  // just their own).
   { name: 'Sell', path: '/sell', element: <SellPage /> },
   { name: 'Products', path: '/products', element: <ProductsPage /> },
   { name: 'Stock', path: '/stock', element: <StockPage /> },
   { name: 'Debts', path: '/debts', element: <DebtsPage /> },
+  { name: 'Orders', path: '/orders', element: <OrdersPage /> },
 
-  { name: 'Orders', path: '/orders', element: <OrdersPage />, roles: ['SUPER_ADMIN'] },
   { name: 'Stock Movements', path: '/stock-movements', element: <StockMovementsPage />, roles: ['SUPER_ADMIN'] },
   { name: 'Reports', path: '/reports', element: <ReportsPage />, roles: ['SUPER_ADMIN'] },
   { name: 'Profit', path: '/profit', element: <ProfitPage />, roles: ['SUPER_ADMIN'] },
