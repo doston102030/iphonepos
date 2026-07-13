@@ -34,40 +34,37 @@ type CheckoutForm = z.infer<typeof checkoutSchema>;
 function ProductGridCard({ product }: { product: ProductResponse }) {
   const { quantityOf, addItem, decrementItem } = useCart();
   const qty = quantityOf(product.id);
-  const outOfStock = product.stockQuantity <= 0;
+  // Sold-out products never reach this grid, so the only ceiling left to hold
+  // is "don't put more in the cart than the shelf actually has".
+  const atStockLimit = qty >= product.stockQuantity;
 
   return (
-    <Card className={cn('shadow-card relative rounded-2xl', outOfStock && 'opacity-60')}>
-      <CardContent className="p-3">
+    <Card className="shadow-card relative rounded-2xl h-full">
+      <CardContent className="flex h-full flex-col p-3">
         {qty > 0 && (
           <span className="absolute -top-2 -right-2 h-6 min-w-6 px-1 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-hover z-10">
             {qty}
           </span>
         )}
-        <div className="h-11 w-11 rounded-2xl bg-gradient-primary flex items-center justify-center mb-2.5">
-          <Package className="h-5 w-5 text-white" />
-        </div>
-        <p className="text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</p>
-        <p className="text-sm font-bold text-brand mt-1">{formatCurrency(product.price)}</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">
-          {outOfStock ? 'Tugagan' : `${product.stockQuantity} dona`}
-        </p>
-        <div className="flex items-center gap-2 mt-3">
+        <p className="text-base font-bold leading-tight line-clamp-2 break-words">{product.name}</p>
+        <p className="text-base font-bold text-brand mt-1.5">{formatCurrency(product.price)}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{product.stockQuantity} dona</p>
+        <div className="flex items-center gap-2 mt-auto pt-3">
           <button
             type="button"
             aria-label="Kamaytirish"
             disabled={qty === 0}
             onClick={() => decrementItem(product.id)}
-            className="flex-1 h-10 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center disabled:opacity-30 press"
+            className="flex-1 h-9 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center disabled:opacity-30 press"
           >
             <Minus className="h-4 w-4" />
           </button>
           <button
             type="button"
             aria-label="Qo'shish"
-            disabled={outOfStock || qty >= product.stockQuantity}
+            disabled={atStockLimit}
             onClick={() => addItem(product)}
-            className="flex-1 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center disabled:opacity-30 press"
+            className="flex-1 h-9 rounded-xl bg-success/10 text-success flex items-center justify-center disabled:opacity-30 press"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -86,6 +83,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
     defaultValues: { paymentMethod: 'CASH', customerName: '', customerPhone: '' },
   });
   const paymentMethod = form.watch('paymentMethod');
+  const isCredit = paymentMethod === 'CREDIT';
 
   useEffect(() => {
     if (open) form.reset({ paymentMethod: 'CASH', customerName: '', customerPhone: '' });
@@ -98,7 +96,6 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
       toast.error(`${insufficientItem.product.name} uchun ombordagi qoldiq yetarli emas`);
       return;
     }
-    const isCredit = values.paymentMethod === 'CREDIT';
     try {
       await ordersApi.create({
         items: items.map(c => ({ productId: c.product.id, quantity: c.quantity })),
@@ -106,7 +103,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
         customerName: values.customerName || undefined,
         customerPhone: values.customerPhone || undefined,
         // Qarzga: nothing is paid up front, the balance becomes a debt.
-        paidAmount: isCredit ? 0 : undefined,
+        paidAmount: values.paymentMethod === 'CREDIT' ? 0 : undefined,
       });
       toast.success('Savdo yakunlandi');
       clear();
@@ -230,15 +227,20 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
         </div>
 
         <div className="shrink-0 bg-background border-t border-border/50 px-4 pt-4 pb-4 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] safe-area-bottom">
-          <div className="flex justify-between items-end mb-3 px-1 gap-3">
-            <div className="space-y-1 shrink-0">
-              <p className="text-sm text-muted-foreground font-medium">Jami:</p>
-              <p className="text-sm text-muted-foreground font-medium">To'lash kerak:</p>
-            </div>
-            <div className="space-y-1 text-right min-w-0">
-              <p className="text-sm font-bold truncate">{formatCurrency(totalPrice)}</p>
-              <p className="text-xl font-black text-success truncate">{formatCurrency(totalPrice)}</p>
-            </div>
+          {/* One number, one label. This screen collects no discount, so a
+              separate "Jami" line would only repeat the total — and on a credit
+              sale nothing is collected now, so calling it "to'lash kerak" would
+              be a lie. */}
+          <div className="flex items-center justify-between gap-3 mb-3 px-1">
+            <p className="text-sm text-muted-foreground font-medium shrink-0">
+              {isCredit ? 'Qarzga yoziladi:' : "To'lash kerak:"}
+            </p>
+            <p className={cn(
+              'text-2xl font-black truncate',
+              isCredit ? 'text-brand' : 'text-success'
+            )}>
+              {formatCurrency(totalPrice)}
+            </p>
           </div>
           <Button
             type="submit"
@@ -260,7 +262,13 @@ export default function SellPage() {
   const [search, setSearch] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const { totalCount, totalPrice, addItem } = useCart();
+  const { totalCount, totalPrice, addItem, quantityOf } = useCart();
+
+  // Nothing sold out belongs on a till screen — you cannot sell it, and it only
+  // pushes the sellable products further down the grid. The server has no
+  // "in stock only" filter, so the fetched page is narrowed here.
+  const sellable = products.filter(p => p.stockQuantity > 0);
+  const allSoldOut = products.length > 0 && sellable.length === 0;
 
   const load = useCallback(async (q: string) => {
     setLoading(true);
@@ -283,12 +291,22 @@ export default function SellPage() {
     try {
       const product = await productsApi.getByBarcode(barcode);
       if (!product) { toast.error('Bu shtrix-kodli mahsulot topilmadi'); return; }
+      // addItem silently refuses to go past the stock ceiling, so without these
+      // two checks a scan of a sold-out product would still toast "qo'shildi".
+      if (product.stockQuantity <= 0) {
+        toast.error(`${product.name} — omborda tugagan`);
+        return;
+      }
+      if (quantityOf(product.id) >= product.stockQuantity) {
+        toast.error(`${product.name} — ombordagi qoldiq yetarli emas`);
+        return;
+      }
       addItem(product);
       toast.success(`${product.name} savatchaga qo'shildi`);
     } catch {
       toast.error('Bu shtrix-kodli mahsulot topilmadi');
     }
-  }, [addItem]);
+  }, [addItem, quantityOf]);
 
   return (
     <MainLayout>
@@ -309,12 +327,17 @@ export default function SellPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 items-stretch">
           {loading ? (
-            Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[190px] rounded-2xl" />)
-          ) : products.length === 0 ? (
+            Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[140px] rounded-2xl" />)
+          ) : allSoldOut ? (
+            <div className="col-span-full flex flex-col items-center py-12 text-muted-foreground">
+              <Package className="h-10 w-10 mb-3 opacity-50" />
+              <p className="text-sm">Sotuvga tayyor mahsulot yo'q — barchasi tugagan</p>
+            </div>
+          ) : sellable.length === 0 ? (
             <p className="col-span-full text-center py-10 text-sm text-muted-foreground">Mahsulot topilmadi</p>
-          ) : products.map(p => <ProductGridCard key={p.id} product={p} />)}
+          ) : sellable.map(p => <ProductGridCard key={p.id} product={p} />)}
         </div>
       </div>
 

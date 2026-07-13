@@ -33,6 +33,17 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
         configure(proxy) {
+          // `changeOrigin` only rewrites Host — the browser's Origin header
+          // (https://localhost:5173) still reaches the backend, whose CORS
+          // filter answers "403 Invalid CORS request" before it ever looks at
+          // the request body. Dropping Origin/Referer makes the call look
+          // server-to-server, which is what production does too (Vercel's
+          // rewrite forwards neither).
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.removeHeader("origin");
+            proxyReq.removeHeader("referer");
+          });
+
           // Without this, an unreachable backend (bad host, DNS failure, TLS
           // error) surfaces in the browser as a bare 500 with no explanation.
           proxy.on("error", (err, _req, res) => {
