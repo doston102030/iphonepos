@@ -54,7 +54,17 @@ export function BarcodeScannerDialog({
       onDetectedRef.current(decodedText);
       onOpenChangeRef.current(false);
     };
-    const scanConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
+    // A wide, short scanning window — a product barcode is a horizontal strip,
+    // not a square, so the box tracks its shape and the camera samples faster.
+    const scanConfig = {
+      fps: 20,
+      qrbox: (vw: number, vh: number) => {
+        const width = Math.floor(Math.min(vw * 0.85, 340));
+        const height = Math.floor(Math.min(width * 0.6, vh * 0.5));
+        return { width, height };
+      },
+      aspectRatio: 1.777,
+    };
 
     // Wait a bit for the overlay animation and DOM to settle.
     const timer = setTimeout(() => {
@@ -64,6 +74,10 @@ export function BarcodeScannerDialog({
         scanner = new Html5Qrcode(containerRef.current!.id, {
           verbose: false,
           formatsToSupport: SUPPORTED_FORMATS,
+          // Hand decoding to the browser's built-in BarcodeDetector where it
+          // exists (all modern Android Chrome): it reads off the live camera far
+          // faster and locks onto worn or angled barcodes the JS decoder misses.
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         });
 
         // Prefer the rear camera, but fall back to the front camera or any
@@ -125,7 +139,10 @@ export function BarcodeScannerDialog({
           {!error && (
             <>
               <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[72vw] max-w-[280px] aspect-square rounded-3xl ring-2 ring-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none" />
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-[340px] aspect-[5/3] rounded-3xl ring-2 ring-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none">
+                {/* A red aiming line down the middle — line it up with the barcode. */}
+                <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-0.5 bg-red-500/80 rounded-full" />
+              </div>
             </>
           )}
         </div>

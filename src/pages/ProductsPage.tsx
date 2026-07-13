@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Plus, Search, Pencil, Trash2, RefreshCw, PackageCheck, History, PackageMinus } from 'lucide-react';
 import { toast } from 'sonner';
+import { notify } from '@/lib/notify';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -37,7 +38,21 @@ import {
   getOutflowReasonLabel, getStockMovementTypeLabel
 } from '@/lib/utils';
 
-const ROW_INPUT_CLASS = 'flex-1 border-0 shadow-none text-right p-0 h-auto text-sm font-semibold focus-visible:ring-0 bg-transparent';
+// min-w-0 lets the value shrink instead of shoving the label; pl-2 keeps a long
+// value from touching the label; text stays right-aligned like a receipt.
+const ROW_INPUT_CLASS = 'flex-1 min-w-0 border-0 shadow-none text-right pl-2 p-0 h-auto text-sm font-semibold focus-visible:ring-0 bg-transparent';
+
+// A number field that shows nothing (not "0") when empty, so typing "50" gives
+// 50 — not "500", which is what a stuck leading zero produced. An emptied field
+// reads back as 0, and the schema's min() rules reject it where that's illegal.
+function numberFieldProps(field: { value: number; onChange: (v: number) => void }) {
+  return {
+    ...field,
+    value: field.value === 0 || field.value === undefined || Number.isNaN(field.value) ? '' : field.value,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      field.onChange(e.target.value === '' ? 0 : Number(e.target.value)),
+  };
+}
 
 /** The server accepts exactly these three outflow reasons — free text is rejected. */
 const OUTFLOW_REASONS: OutflowReason[] = ['DAMAGED', 'LOST', 'RETURNED'];
@@ -115,15 +130,15 @@ function ProductDialog({
     try {
       if (product) {
         await productsApi.update(product.id, values);
-        toast.success('Mahsulot yangilandi');
+        notify.success('Mahsulot yangilandi');
       } else {
         await productsApi.create(values);
-        toast.success('Mahsulot yaratildi');
+        notify.success('Mahsulot yaratildi');
       }
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Xato yuz berdi');
+      notify.error(err instanceof Error ? err.message : 'Xato yuz berdi');
     }
   }
 
@@ -167,7 +182,7 @@ function ProductDialog({
                   <div className="flex items-center gap-3">
                     <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Kelish narxi</FormLabel>
                     <FormControl>
-                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
+                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...numberFieldProps(field)} />
                     </FormControl>
                   </div>
                   <FormMessage className="text-right" />
@@ -178,7 +193,7 @@ function ProductDialog({
                   <div className="flex items-center gap-3">
                     <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Sotish narxi</FormLabel>
                     <FormControl>
-                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
+                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...numberFieldProps(field)} />
                     </FormControl>
                   </div>
                   <FormMessage className="text-right" />
@@ -189,7 +204,7 @@ function ProductDialog({
                   <div className="flex items-center gap-3">
                     <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Ombordagi</FormLabel>
                     <FormControl>
-                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...field} />
+                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...numberFieldProps(field)} />
                     </FormControl>
                   </div>
                   <FormMessage className="text-right" />
@@ -238,9 +253,9 @@ function RestockDialog({
     if (!product) return;
     try {
       await productsApi.restock(product.id, values);
-      toast.success('Ombor to\'ldirildi');
+      notify.success('Ombor to\'ldirildi');
       onSaved(); onOpenChange(false);
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Xato'); }
+    } catch (err) { notify.error(err instanceof Error ? err.message : 'Xato'); }
   }
 
   return (
@@ -257,7 +272,7 @@ function RestockDialog({
           <FormField control={form.control} name="quantity" render={({ field }) => (
             <FormItem>
               <FormLabel className="font-semibold text-muted-foreground">Miqdor</FormLabel>
-              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...numberFieldProps(field)} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
@@ -285,14 +300,14 @@ function OutflowDialog({
   async function onSubmit(values: OutflowForm) {
     if (!product) return;
     if (values.quantity > product.stockQuantity) {
-      toast.error(`Ombordagi qoldiq: ${product.stockQuantity} dona`);
+      notify.error(`Ombordagi qoldiq: ${product.stockQuantity} dona`);
       return;
     }
     try {
       await productsApi.createOutflow(product.id, values);
-      toast.success('Chiqim yaratildi');
+      notify.success('Chiqim yaratildi');
       onSaved(); onOpenChange(false);
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Xato'); }
+    } catch (err) { notify.error(err instanceof Error ? err.message : 'Xato'); }
   }
 
   return (
@@ -309,7 +324,7 @@ function OutflowDialog({
           <FormField control={form.control} name="quantity" render={({ field }) => (
             <FormItem>
               <FormLabel className="font-semibold text-muted-foreground">Miqdor</FormLabel>
-              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} max={product?.stockQuantity} {...field} /></FormControl>
+              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} max={product?.stockQuantity} {...numberFieldProps(field)} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
@@ -356,9 +371,9 @@ function ReceiveDialog({ open, onOpenChange, onSaved }: {
   async function onSubmit(values: ReceiveForm) {
     try {
       await productsApi.receive(values);
-      toast.success('Tovar qabul qilindi');
+      notify.success('Tovar qabul qilindi');
       onSaved(); onOpenChange(false);
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Xato'); }
+    } catch (err) { notify.error(err instanceof Error ? err.message : 'Xato'); }
   }
 
   return (
@@ -388,7 +403,7 @@ function ReceiveDialog({ open, onOpenChange, onSaved }: {
             <FormField control={form.control} name="quantity" render={({ field }) => (
               <FormItem>
                 <FormLabel className="font-semibold text-muted-foreground">Miqdor</FormLabel>
-                <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...field} /></FormControl>
+                <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...numberFieldProps(field)} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -396,14 +411,14 @@ function ReceiveDialog({ open, onOpenChange, onSaved }: {
               <FormField control={form.control} name="purchasePrice" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="font-semibold text-muted-foreground">Kelish narxi</FormLabel>
-                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={0} {...field} /></FormControl>
+                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={0} {...numberFieldProps(field)} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="price" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="font-semibold text-muted-foreground">Sotish narxi</FormLabel>
-                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={0} {...field} /></FormControl>
+                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={0} {...numberFieldProps(field)} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -528,7 +543,7 @@ export default function ProductsPage() {
     if (!deleteId) return;
     try {
       await productsApi.delete(deleteId);
-      toast.success("Mahsulot o'chirildi");
+      notify.success("Mahsulot o'chirildi");
       load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Xato');

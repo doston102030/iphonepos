@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, DollarSign, Search, Calendar, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { notify } from '@/lib/notify';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -73,15 +74,15 @@ function DebtDialog({
     try {
       if (debt) {
         await debtsApi.update(debt.id, payload);
-        toast.success('Qarz yangilandi');
+        notify.success('Qarz yangilandi');
       } else {
         await debtsApi.create(payload);
-        toast.success('Qarz yaratildi');
+        notify.success('Qarz yaratildi');
       }
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Xato yuz berdi');
+      notify.error(err instanceof Error ? err.message : 'Xato yuz berdi');
     }
   }
 
@@ -112,7 +113,15 @@ function DebtDialog({
           <FormField control={form.control} name="amount" render={({ field }) => (
             <FormItem>
               <FormLabel className="font-semibold text-muted-foreground">Qarz summasi</FormLabel>
-              <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4 font-bold" type="number" inputMode="numeric" min={0} {...field} /></FormControl>
+              <FormControl>
+                <Input
+                  className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4 font-bold"
+                  type="number" inputMode="numeric" min={0} placeholder="0"
+                  {...field}
+                  value={field.value === 0 || field.value === undefined ? '' : field.value}
+                  onChange={e => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )} />
@@ -144,21 +153,21 @@ function PayDialog({
     if (!debt) return;
     const amount = parseInt(amountStr, 10);
     if (isNaN(amount) || amount <= 0) {
-      toast.error('Summani to\'g\'ri kiriting');
+      notify.error('Summani to\'g\'ri kiriting');
       return;
     }
     if (amount > remainingAmount(debt)) {
-      toast.error(`Qolgan summa: ${formatCurrency(remainingAmount(debt))}`);
+      notify.error(`Qolgan summa: ${formatCurrency(remainingAmount(debt))}`);
       return;
     }
     setLoading(true);
     try {
       await debtsApi.pay(debt.id, { amount });
-      toast.success("To'lov amalga oshirildi");
+      notify.success("To'lov amalga oshirildi");
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Xato yuz berdi');
+      notify.error(err instanceof Error ? err.message : 'Xato yuz berdi');
     } finally {
       setLoading(false);
     }
@@ -365,10 +374,10 @@ export default function DebtsPage() {
     if (!deleteId) return;
     try {
       await debtsApi.delete(deleteId);
-      toast.success("Qarz o'chirildi");
+      notify.success("Qarz o'chirildi");
       load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Xato');
+      notify.error(err instanceof Error ? err.message : 'Xato');
     } finally { setDeleteId(null); }
   }
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, Delete, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { notify } from '@/lib/notify';
 import { Logo } from '@/components/common/Logo';
 import { authApi } from '@/lib/api';
 import { homePathFor } from '@/routes';
@@ -32,7 +32,7 @@ export default function LoginPage() {
     try {
       const res = await authApi.login({ pin: value });
       login(res);
-      toast.success(`Xush kelibsiz, ${res.fullName}!`);
+      notify.success(`Xush kelibsiz, ${res.fullName}!`);
       // No deep link to honour: land on whatever "home" means for this role — a
       // cashier has no dashboard, so sending them to "/" would only bounce.
       navigate(from ?? homePathFor(res.role), { replace: true });

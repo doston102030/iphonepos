@@ -19,6 +19,7 @@ import {
   productsApi, ordersApi, fetchAllPages, newIdempotencyKey, type ProductResponse,
 } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
+import { notify } from '@/lib/notify';
 
 // The API's paymentMethod also allows MIXED, but that needs a paidAmount split
 // this screen does not collect — so it is not offered here.
@@ -26,6 +27,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 // — a single error pinned to customerName left an empty phone field unmarked.
 const checkoutSchema = z.object({
   paymentMethod: z.enum(['CASH', 'CARD', 'CREDIT']),
+  discountAmount: z.coerce.number().min(0).optional(),
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
 })
@@ -46,7 +48,7 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
   const atStockLimit = qty >= product.stockQuantity;
 
   return (
-    <Card className="shadow-card relative rounded-2xl h-full">
+    <Card className="relative rounded-2xl h-full border border-border/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.10)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.45)]">
       <CardContent className="flex h-full flex-col p-3">
         {qty > 0 && (
           <span className="absolute -top-2 -right-2 h-6 min-w-6 px-1 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-hover z-10">
@@ -91,6 +93,9 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
   });
   const paymentMethod = form.watch('paymentMethod');
   const isCredit = paymentMethod === 'CREDIT';
+  // A discount can never make an order negative or drop below zero to pay.
+  const discount = Math.min(Math.max(0, Number(form.watch('discountAmount')) || 0), totalPrice);
+  const payable = totalPrice - discount;
 
   // One key per opened cart, deliberately NOT per submit: if the first attempt's
   // response is lost to a dropped connection, the retry carries the same key and
@@ -99,7 +104,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
 
   useEffect(() => {
     if (open) {
-      form.reset({ paymentMethod: 'CASH', customerName: '', customerPhone: '' });
+      form.reset({ paymentMethod: 'CASH', discountAmount: 0, customerName: '', customerPhone: '' });
       idempotencyKey.current = newIdempotencyKey();
     }
   }, [open, form]);
@@ -115,17 +120,18 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
       await ordersApi.create({
         items: items.map(c => ({ productId: c.product.id, quantity: c.quantity })),
         paymentMethod: values.paymentMethod,
+        discountAmount: discount > 0 ? discount : undefined,
         customerName: values.customerName || undefined,
         customerPhone: values.customerPhone || undefined,
         // Qarzga: nothing is paid up front, the balance becomes a debt.
         paidAmount: values.paymentMethod === 'CREDIT' ? 0 : undefined,
       }, idempotencyKey.current);
-      toast.success('Savdo yakunlandi');
+      notify.success('Savdo yakunlandi');
       clear();
       onOpenChange(false);
       onCompleted();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Xato yuz berdi');
+      notify.error(err instanceof Error ? err.message : 'Xato yuz berdi');
     }
   }
 
@@ -218,6 +224,27 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
                 </div>
               </div>
 
+              <div>
+                <p className="font-bold text-base mb-3 px-1">Chegirma (ixtiyoriy)</p>
+                <FormField control={form.control} name="discountAmount" render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type="number" inputMode="numeric" min={0}
+                          className="h-14 rounded-2xl bg-muted/50 border-0 text-base px-4 pr-14 font-semibold"
+                          placeholder="0"
+                          {...field}
+                          value={field.value === 0 || field.value === undefined ? '' : field.value}
+                          onChange={e => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium pointer-events-none">so'm</span>
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )} />
+              </div>
+
               {paymentMethod === 'CREDIT' && (
                 <div className="bg-background rounded-3xl p-4 space-y-4 shadow-sm border border-border/50">
                   <p className="font-bold text-sm text-muted-foreground px-1">Mijoz ma'lumotlari</p>
@@ -247,10 +274,20 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
         </div>
 
         <div className="shrink-0 bg-background border-t border-border/50 px-4 pt-4 pb-4 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] safe-area-bottom">
-          {/* One number, one label. This screen collects no discount, so a
-              separate "Jami" line would only repeat the total — and on a credit
-              sale nothing is collected now, so calling it "to'lash kerak" would
-              be a lie. */}
+          {/* Jami and Chegirma only appear once there's a discount to explain —
+              otherwise the payable line would just repeat the subtotal. */}
+          {discount > 0 && (
+            <div className="space-y-1 mb-2 px-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">Jami:</p>
+                <p className="text-sm font-semibold">{formatCurrency(totalPrice)}</p>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">Chegirma:</p>
+                <p className="text-sm font-semibold text-destructive">− {formatCurrency(discount)}</p>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-3 mb-3 px-1">
             <p className="text-sm text-muted-foreground font-medium shrink-0">
               {isCredit ? 'Qarzga yoziladi:' : "To'lash kerak:"}
@@ -259,7 +296,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
               'text-2xl font-black truncate',
               isCredit ? 'text-brand' : 'text-success'
             )}>
-              {formatCurrency(totalPrice)}
+              {formatCurrency(payable)}
             </p>
           </div>
           <Button

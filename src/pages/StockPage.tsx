@@ -35,7 +35,7 @@ function StockCard({ product }: { product: ProductResponse }) {
     group === 'LOW' ? 'text-brand' : 'text-success';
 
   return (
-    <Card className="shadow-card rounded-2xl">
+    <Card className="rounded-2xl border border-border/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.10)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.45)]">
       <CardContent className="flex items-center gap-3 p-4">
         <div className={cn(
           'h-11 w-11 shrink-0 rounded-2xl flex items-center justify-center',
