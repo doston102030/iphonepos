@@ -67,8 +67,11 @@
     --brand-foreground: 0 0% 100%;
     --destructive: 4 78% 50%;       /* systemRed, deepened */
     --destructive-foreground: 0 0% 100%;
-    --border: 240 11% 91%;          /* systemGray5 */
-    --input: 240 11% 91%;
+    /* One step darker than systemGray5: at 91% lightness a hairline on a white
+       card melts into the grey page — cards read as floating blobs. 86% is the
+       iOS separator weight: visible, still unmistakably a hairline. */
+    --border: 240 8% 86%;
+    --input: 240 8% 86%;
     --ring: 211 100% 46%;
     --success: 145 66% 32%;         /* systemGreen, deepened for text on white */
     --warning: 30 100% 36%;
@@ -115,8 +118,8 @@
     --brand-foreground: 240 6% 10%;
     --destructive: 3 100% 61%;      /* systemRed (dark) #FF453A */
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5% 21%;
-    --input: 240 5% 21%;
+    --border: 240 5% 27%;
+    --input: 240 5% 27%;
     --ring: 211 100% 52%;
     --success: 135 64% 51%;         /* systemGreen (dark) #30D158 */
     --warning: 37 100% 52%;
@@ -149,7 +152,7 @@
        indicator. --bottom-nav-h is the total space it occupies; pages pad their
        scroll area by it so nothing hides behind the dock. Derived, not
        hand-tuned — change --dock-h/--dock-gap and the padding follows. */
-    --dock-h: 4rem;
+    --dock-h: 4.5rem;
     --dock-gap: 0.75rem;
     /* Device inset, however the app is hosted. A plain browser/PWA reports it
        via env(); a fullscreen Telegram Mini App reports zeros there and sets
@@ -289,8 +292,27 @@
   }
   .tg-app .bg-background\/70,
   .tg-app .bg-background\/80,
-  .tg-app .bg-background\/90 {
+  .tg-app .bg-background\/90,
+  .tg-app .\!bg-background\/90 {
     background-color: hsl(var(--background)) !important;
+  }
+
+  /* iOS-style toast tinting: the capsule stays neutral glass, only the icon
+     glyph carries the state colour. (richColors would paint the whole toast.) */
+  [data-sonner-toast] [data-icon] {
+    color: hsl(var(--primary));
+  }
+  [data-sonner-toast][data-type='success'] [data-icon] {
+    color: hsl(var(--success));
+  }
+  [data-sonner-toast][data-type='error'] [data-icon] {
+    color: hsl(var(--destructive));
+  }
+  [data-sonner-toast][data-type='warning'] [data-icon] {
+    color: hsl(var(--warning));
+  }
+  [data-sonner-toast][data-type='info'] [data-icon] {
+    color: hsl(var(--info));
   }
 
   .scrollbar-none {

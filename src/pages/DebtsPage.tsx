@@ -207,7 +207,7 @@ function PayDialog({
             onChange={setAmountStr} 
             onEnter={handlePay} 
             allowDecimal={false} 
-            className="rounded-[28px] bg-muted/20 p-2 border border-border/40"
+            className="rounded-[28px] bg-muted/20 p-2 border border-border"
           />
         </div>
       </div>
@@ -264,7 +264,7 @@ function PaymentHistoryDialog({
         ) : (
           <div className="space-y-2">
             {payments.map(p => (
-              <div key={p.id} className="flex items-center gap-3 p-3.5 rounded-2xl bg-muted/30 border border-border/50">
+              <div key={p.id} className="flex items-center gap-3 p-3.5 rounded-2xl bg-muted/30 border border-border">
                 <div className="h-9 w-9 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
                   <Calendar className="h-4 w-4" />
                 </div>
@@ -420,15 +420,17 @@ export default function DebtsPage() {
           </p>
         )}
 
-        <div className="flex gap-1 p-1 rounded-2xl bg-muted mb-4">
+        <div className="flex gap-1 p-1 rounded-2xl bg-muted border border-border mb-4">
           {STATUS_TABS.map(tab => (
             <button
               key={tab.value}
               type="button"
               onClick={() => setStatusFilter(tab.value)}
               className={cn(
-                'flex-1 min-w-0 h-10 px-2 rounded-xl text-[13px] font-semibold transition-colors truncate press',
-                statusFilter === tab.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
+                'flex-1 min-w-0 h-10 px-2 rounded-xl text-[13px] font-semibold transition-colors truncate press border',
+                statusFilter === tab.value
+                  ? 'bg-card text-foreground border-border shadow-sm'
+                  : 'text-muted-foreground border-transparent'
               )}
             >
               {tab.label}

@@ -178,7 +178,7 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
     return 0;
   };
 
-  const tabClass = 'flex-1 flex flex-col items-center justify-center gap-1 h-full rounded-full text-[11px] font-semibold tracking-tight press';
+  const tabClass = 'flex-1 flex flex-col items-center justify-center gap-1 h-full rounded-full text-xs font-semibold tracking-tight press';
 
   return (
     // A floating iOS-style dock rather than a bar welded to the screen edge: the
@@ -186,7 +186,7 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
     // home indicator. `nav-dock-inset` owns the gap so the sum still equals
     // --bottom-nav-h, which every page pads by.
     <nav className="absolute bottom-0 left-0 right-0 z-40 px-3 pointer-events-none nav-dock-inset">
-      <div className="pointer-events-auto flex items-stretch h-[var(--dock-h)] rounded-full bg-background/70 backdrop-blur-2xl border border-border/60 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.22)] dark:shadow-[0_8px_28px_-6px_rgba(0,0,0,0.6)] px-1.5">
+      <div className="pointer-events-auto flex items-stretch h-[var(--dock-h)] rounded-full bg-background/70 backdrop-blur-2xl border border-border shadow-[0_8px_28px_-6px_rgba(0,0,0,0.22)] dark:shadow-[0_8px_28px_-6px_rgba(0,0,0,0.6)] px-2">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = isPathActive(location.pathname, tab.path);
@@ -198,15 +198,15 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
               className={cn(tabClass, isActive ? 'text-primary' : 'text-muted-foreground')}
             >
               <span className={cn(
-                'relative flex items-center justify-center h-8 w-12 rounded-full transition-all duration-200',
+                'relative flex items-center justify-center h-9 w-14 rounded-full transition-all duration-200',
                 isActive && 'bg-primary/10'
               )}>
                 <Icon
-                  className={cn('h-[23px] w-[23px] transition-transform duration-200', isActive && 'scale-105')}
+                  className={cn('h-[26px] w-[26px] transition-transform duration-200', isActive && 'scale-105')}
                   strokeWidth={isActive ? 2.3 : 1.9}
                 />
                 {badge > 0 && (
-                  <span className="absolute -top-1.5 right-0.5 h-[17px] min-w-[17px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center border-2 border-background">
+                  <span className="absolute -top-1.5 right-1 h-[18px] min-w-[18px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center border-2 border-background">
                     {badge > 99 ? '99+' : badge}
                   </span>
                 )}
@@ -249,7 +249,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
                 type="button"
                 onClick={() => handleNav(item.path)}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 press',
+                  'flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border press',
                   isActive ? 'bg-primary/10 text-primary border-primary/20 shadow-card' : 'bg-background text-foreground hover:bg-muted/50 shadow-card'
                 )}
               >
@@ -267,7 +267,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border/50 bg-background text-foreground hover:bg-muted/50 shadow-card press"
+            className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl transition-colors h-28 border border-border bg-background text-foreground hover:bg-muted/50 shadow-card press"
           >
             <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground">
               {theme === 'dark' ? <Sun className="h-6 w-6 text-amber-400" /> : <Moon className="h-6 w-6" />}
@@ -277,7 +277,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
         </div>
 
         {/* User Profile Card — pinned to the bottom of the sheet */}
-        <div className="mt-auto bg-background rounded-3xl p-4 flex items-center justify-between shadow-card border border-border/50">
+        <div className="mt-auto bg-background rounded-3xl p-4 flex items-center justify-between shadow-card border border-border">
           <div className="flex items-center gap-3">
             <div className="h-14 w-14 rounded-full bg-gradient-primary flex items-center justify-center shadow-md shrink-0">
               <span className="text-2xl font-bold text-white">{user?.fullName?.[0]?.toUpperCase() ?? 'U'}</span>

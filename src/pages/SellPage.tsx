@@ -55,7 +55,7 @@ function ProductGridCard({ product, onEdit }: { product: ProductResponse; onEdit
   const atStockLimit = qty >= product.stockQuantity;
 
   return (
-    <Card className="relative rounded-2xl h-full border border-border/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.10)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.45)]">
+    <Card className="relative rounded-2xl h-full shadow-[0_2px_8px_-2px_rgba(0,0,0,0.10)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.45)]">
       <CardContent className="flex h-full flex-col p-3">
         {qty > 0 && (
           <span className="absolute -top-2 -right-2 h-6 min-w-6 px-1 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-hover z-10">
@@ -279,7 +279,7 @@ function CartItemRow({ item, onEdit }: { item: CartItem; onEdit: () => void }) {
       </div>
       <div className="flex items-center justify-between gap-2">
         <p className="font-bold text-lg text-primary min-w-0 truncate">{formatCurrency(product.price * quantity)}</p>
-        <div className="flex items-center gap-1 bg-background rounded-xl p-1 shadow-sm border border-border/50 shrink-0">
+        <div className="flex items-center gap-1 bg-background rounded-xl p-1 shadow-sm border border-border shrink-0">
           <button
             type="button"
             aria-label="Kamaytirish"
@@ -376,7 +376,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
     'h-14 rounded-2xl font-bold text-base transition-colors border-2 press',
     paymentMethod === method
       ? 'border-primary bg-primary/10 text-primary'
-      : 'border-border/60 bg-background text-foreground'
+      : 'border-border bg-background text-foreground'
   );
 
   return (
@@ -396,7 +396,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
     >
       <div className="flex flex-col h-full bg-muted/10">
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
-          <div className="bg-background rounded-3xl p-2 space-y-2 shadow-sm border border-border/50">
+          <div className="bg-background rounded-3xl p-2 space-y-2 shadow-sm border border-border">
             {items.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground flex flex-col items-center justify-center opacity-60">
                 <ShoppingCart className="h-12 w-12 mb-3" />
@@ -440,7 +440,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
               </div>
 
               {paymentMethod === 'CREDIT' && (
-                <div className="bg-background rounded-3xl p-4 space-y-4 shadow-sm border border-border/50">
+                <div className="bg-background rounded-3xl p-4 space-y-4 shadow-sm border border-border">
                   <p className="font-bold text-sm text-muted-foreground px-1">Mijoz ma'lumotlari</p>
                   {/* Without these, the zod refine below silently blocked the
                       submit: the cashier pressed "Tasdiqlash" and nothing at all
@@ -471,7 +471,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
             not a bar welded to it: the confirm button used to sit flush against
             the bottom, half under the thumb. One calc'd margin, not mb-6 +
             safe-area-mb — both set margin-bottom, so one would silently lose. */}
-        <div className="shrink-0 bg-background border border-border/50 mx-3 mb-[calc(1.25rem+var(--inset-bottom,0px))] px-4 py-4 rounded-3xl shadow-hover">
+        <div className="shrink-0 bg-background border border-border mx-3 mb-[calc(1.25rem+var(--inset-bottom,0px))] px-4 py-4 rounded-3xl shadow-hover">
           {/* Jami and Chegirma only appear once there's a discount to explain —
               otherwise the payable line would just repeat the subtotal. */}
           {discount > 0 && (

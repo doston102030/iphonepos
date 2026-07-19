@@ -98,7 +98,7 @@ export default function LoginPage() {
 
       {/* Mobile keeps the edge-to-edge sheet; from sm up the same content sits
           in a centered card, which is the whole "desktop redesign". */}
-      <div className="relative w-full max-w-[340px] flex flex-col items-center gap-7 animate-fade-in sm:max-w-[400px] sm:rounded-3xl sm:border sm:border-border/70 sm:bg-card sm:px-10 sm:py-10 sm:shadow-card">
+      <div className="relative w-full max-w-[340px] flex flex-col items-center gap-7 animate-fade-in sm:max-w-[400px] sm:rounded-3xl sm:border sm:border-border sm:bg-card sm:px-10 sm:py-10 sm:shadow-card">
         <div className="flex flex-col items-center gap-5">
           <Logo className="h-9" />
           <div className="text-center">

@@ -302,7 +302,7 @@ function RestockDialog({
     <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Omborni to'ldirish`}>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
-          <div className="p-4 bg-muted/30 rounded-2xl mb-4 border border-border/50 text-center">
+          <div className="p-4 bg-muted/30 rounded-2xl mb-4 border border-border text-center">
             <p className="text-muted-foreground text-sm mb-1">Mahsulot</p>
             <h3 className="font-bold text-lg">{product?.name}</h3>
             <p className="text-xs text-muted-foreground mt-1">
@@ -354,7 +354,7 @@ function OutflowDialog({
     <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Chiqim`}>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
-          <div className="p-4 bg-muted/30 rounded-2xl mb-4 border border-border/50 text-center">
+          <div className="p-4 bg-muted/30 rounded-2xl mb-4 border border-border text-center">
             <p className="text-muted-foreground text-sm mb-1">Mahsulot</p>
             <h3 className="font-bold text-lg">{product?.name}</h3>
             <p className="text-xs text-muted-foreground mt-1">
@@ -517,7 +517,7 @@ function HistoryDialog({ open, onOpenChange, product }: {
         ) : (
           <div className="space-y-3">
             {history.map(h => (
-              <div key={h.id} className="p-4 bg-muted/30 border border-border/50 rounded-2xl flex items-start justify-between gap-3">
+              <div key={h.id} className="p-4 bg-muted/30 border border-border rounded-2xl flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <Badge variant="outline" className="mb-2 bg-background">{getStockMovementTypeLabel(h.type)}</Badge>
                   <p className="text-xs text-muted-foreground font-medium">{formatDateTime(h.createdAt)}</p>

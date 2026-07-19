@@ -10,7 +10,8 @@ const Card = React.forwardRef<
     ref={ref}
     className={cn(
       // iOS grouped-list card: generous corner, hairline edge, wide soft shadow.
-      "rounded-2xl border border-border/70 bg-card text-card-foreground shadow-card",
+      // Full-strength border — the edge is what separates the card from the page.
+      "rounded-2xl border border-border bg-card text-card-foreground shadow-card",
       className
     )}
     {...props}

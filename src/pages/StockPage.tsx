@@ -36,7 +36,7 @@ function StockCard({ product }: { product: ProductResponse }) {
     group === 'LOW' ? 'text-brand' : 'text-success';
 
   return (
-    <Card className="rounded-2xl border border-border/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.10)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.45)]">
+    <Card className="rounded-2xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.10)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.45)]">
       <CardContent className="flex items-center gap-3 p-4">
         <div className={cn(
           'h-11 w-11 shrink-0 rounded-2xl flex items-center justify-center',
@@ -111,15 +111,17 @@ export default function StockPage() {
       <div className="p-4 md:p-6">
         <PageHeader title="Ombor" description="Mahsulot qoldiqlari holati" />
 
-        <div className="flex gap-1 p-1 rounded-2xl bg-muted mb-4">
+        <div className="flex gap-1 p-1 rounded-2xl bg-muted border border-border mb-4">
           {GROUP_TABS.map(tab => (
             <button
               key={tab.value}
               type="button"
               onClick={() => setGroup(tab.value)}
               className={cn(
-                'flex-1 min-w-0 h-11 px-2 rounded-xl text-[13px] font-semibold transition-colors press',
-                group === tab.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground',
+                'flex-1 min-w-0 h-11 px-2 rounded-xl text-[13px] font-semibold transition-colors press border',
+                group === tab.value
+                  ? 'bg-card text-foreground border-border shadow-sm'
+                  : 'text-muted-foreground border-transparent',
               )}
             >
               <span className="block truncate">{tab.label}</span>
