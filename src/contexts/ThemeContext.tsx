@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { syncTelegramTheme } from '@/lib/telegram';
 
 type Theme = 'light' | 'dark';
 
@@ -27,6 +28,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.remove('dark');
     }
     localStorage.setItem('theme', theme);
+    // Inside Telegram, paint its header/background to match — otherwise the
+    // mini app sits in a mismatched frame after a theme toggle.
+    syncTelegramTheme(theme);
   }, [theme]);
 
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));

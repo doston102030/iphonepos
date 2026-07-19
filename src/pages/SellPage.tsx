@@ -470,7 +470,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
             not a bar welded to it: the confirm button used to sit flush against
             the bottom, half under the thumb. One calc'd margin, not mb-6 +
             safe-area-mb — both set margin-bottom, so one would silently lose. */}
-        <div className="shrink-0 bg-background border border-border/50 mx-3 mb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] px-4 py-4 rounded-3xl shadow-hover">
+        <div className="shrink-0 bg-background border border-border/50 mx-3 mb-[calc(1.25rem+var(--inset-bottom,0px))] px-4 py-4 rounded-3xl shadow-hover">
           {/* Jami and Chegirma only appear once there's a discount to explain —
               otherwise the payable line would just repeat the subtotal. */}
           {discount > 0 && (
