@@ -50,11 +50,18 @@ function KpiCard({
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+/**
+ * One stat per line, label left and number right — the old three-column grid
+ * squeezed "6 160 552 so'm" into a third of a phone card and the digits
+ * wrapped mid-number, unreadable at a glance.
+ */
+function StatRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div>
-      <p className="text-[11px] text-muted-foreground mb-0.5">{label}</p>
-      <p className="text-sm font-bold text-foreground break-words">{value}</p>
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-[13px] text-muted-foreground">{label}</span>
+      <span className={cn('text-sm font-bold text-foreground tabular-nums text-right', strong && 'text-base')}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -356,25 +363,25 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card className="shadow-card">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Bu hafta</CardTitle></CardHeader>
-            <CardContent>
-              {restLoading ? <Skeleton className="h-12 w-full" /> : (
-                <div className="grid grid-cols-3 gap-2">
-                  <MiniStat label="Savdo" value={week ? formatCurrency(week.totalRevenue) : '—'} />
-                  <MiniStat label="Foyda" value={week ? formatCurrency(week.totalProfit) : '—'} />
-                  <MiniStat label="Buyurtma" value={week ? String(week.totalOrders) : '—'} />
-                </div>
+            <CardContent className="space-y-2">
+              {restLoading ? <Skeleton className="h-16 w-full" /> : (
+                <>
+                  <StatRow label="Savdo" value={week ? formatCurrency(week.totalRevenue) : '—'} strong />
+                  <StatRow label="Sof foyda" value={week ? formatCurrency(week.totalProfit) : '—'} />
+                  <StatRow label="Buyurtmalar" value={week ? `${week.totalOrders} ta` : '—'} />
+                </>
               )}
             </CardContent>
           </Card>
           <Card className="shadow-card">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Bu oy</CardTitle></CardHeader>
-            <CardContent>
-              {restLoading ? <Skeleton className="h-12 w-full" /> : (
-                <div className="grid grid-cols-3 gap-2">
-                  <MiniStat label="Savdo" value={month ? formatCurrency(month.totalRevenue) : '—'} />
-                  <MiniStat label="Foyda" value={month ? formatCurrency(month.totalProfit) : '—'} />
-                  <MiniStat label="Buyurtma" value={month ? String(month.totalOrders) : '—'} />
-                </div>
+            <CardContent className="space-y-2">
+              {restLoading ? <Skeleton className="h-16 w-full" /> : (
+                <>
+                  <StatRow label="Savdo" value={month ? formatCurrency(month.totalRevenue) : '—'} strong />
+                  <StatRow label="Sof foyda" value={month ? formatCurrency(month.totalProfit) : '—'} />
+                  <StatRow label="Buyurtmalar" value={month ? `${month.totalOrders} ta` : '—'} />
+                </>
               )}
             </CardContent>
           </Card>

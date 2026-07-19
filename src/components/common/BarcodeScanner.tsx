@@ -3,6 +3,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, Flashlight, FlashlightOff, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
+import { playScanBeep } from '@/lib/sound';
 import { cn } from '@/lib/utils';
 
 const SCANNER_ELEMENT_ID = 'barcode-scanner-viewport';
@@ -78,26 +79,55 @@ export function BarcodeScannerDialog({
 
     const onSuccess = (decodedText: string) => {
       if (!isMounted) return;
+      // The supermarket blip: the cashier knows it read without looking.
+      playScanBeep();
       onDetectedRef.current(decodedText);
       onOpenChangeRef.current(false);
     };
-    // No qrbox: the whole frame is decoded, so a barcode reads the moment it is
-    // anywhere in view — the cashier doesn't have to thread it into a window.
-    // (The white frame in the overlay is aiming guidance, not a boundary.) It
-    // also removes the library's own shaded-region markers, which sat on the
-    // video's box rather than ours and drew a second, misaligned "window".
+    // The decode window matches the white aiming frame. Full-frame decoding was
+    // tried and is FAST on Android (native BarcodeDetector) but crawls on
+    // iPhone, where WebKit has no BarcodeDetector and the JS decoder must chew
+    // the entire 720p frame every tick — scans took seconds. A bounded region
+    // an iPhone decodes in a few ms. The library's own gray region markers are
+    // hidden via CSS (the overlay frame already shows the window).
     //
     // videoConstraints asks for 1280×720: without it the browser hands over
     // 640×480, which leaves a dense EAN-13 too few pixels per bar to decode —
     // the single biggest reason worn barcodes "never scan". `ideal` (never
     // `exact`) so a webcam that can't do 720p still opens at whatever it has.
-    const scanConfig = { fps: 20 };
+    const scanConfig = {
+      fps: 15,
+      qrbox: (vw: number, vh: number) => {
+        const width = Math.floor(Math.min(vw * 0.85, 340));
+        const height = Math.floor(Math.min(width * 0.6, vh * 0.5));
+        return { width, height };
+      },
+    };
     const hd = { width: { ideal: 1280 }, height: { ideal: 720 } };
 
     // After the stream is live: switch to continuous autofocus where the camera
     // supports it (a fixed-focus start leaves close-up barcodes permanently
     // blurred on many Androids), and surface torch/zoom controls if the
     // hardware has them.
+    const readCapabilities = (s: Html5Qrcode): boolean => {
+      let caps: TrackCapabilities = {};
+      try {
+        caps = s.getRunningTrackCapabilities() as TrackCapabilities;
+      } catch {
+        return false;
+      }
+      if (!isMounted) return false;
+      setTorchAvailable(caps.torch === true);
+      if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+        setZoomRange({
+          min: caps.zoom.min,
+          max: Math.min(caps.zoom.max, caps.zoom.min * 5),
+          step: caps.zoom.step || 0.1,
+        });
+        setZoom(caps.zoom.min);
+      }
+      return caps.torch === true || !!caps.zoom;
+    };
     const enhanceTrack = async (s: Html5Qrcode) => {
       let caps: TrackCapabilities = {};
       try {
@@ -109,14 +139,12 @@ export function BarcodeScannerDialog({
         await applyAdvanced(s, { focusMode: 'continuous' }).catch(() => null);
       }
       if (!isMounted) return;
-      setTorchAvailable(caps.torch === true);
-      if (caps.zoom && caps.zoom.max > caps.zoom.min) {
-        setZoomRange({
-          min: caps.zoom.min,
-          max: Math.min(caps.zoom.max, caps.zoom.min * 5),
-          step: caps.zoom.step || 0.1,
-        });
-        setZoom(caps.zoom.min);
+      // iOS reports torch/zoom late on some devices — if nothing showed up on
+      // the first read, ask once more after the track has settled.
+      if (!readCapabilities(s)) {
+        setTimeout(() => {
+          if (isMounted && scannerRef.current === s) readCapabilities(s);
+        }, 900);
       }
     };
 
@@ -214,7 +242,9 @@ export function BarcodeScannerDialog({
               instead. Portrait phone streams fill the screen; a landscape
               webcam letterboxes in the middle rather than sticking to the top. */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div id={SCANNER_ELEMENT_ID} ref={containerRef} className="w-full" />
+            {/* The library draws its own gray region markers for the qrbox;
+                our white frame already marks the window, so hide theirs. */}
+            <div id={SCANNER_ELEMENT_ID} ref={containerRef} className="w-full [&_#qr-shaded-region]:!hidden" />
           </div>
           {!error && (
             <>

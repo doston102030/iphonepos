@@ -45,3 +45,8 @@ export function playSuccess() {
 export function playError() {
   tone(200, 0, 0.28, 0.18);
 }
+
+/** One short high blip — the supermarket-scanner "got it". */
+export function playScanBeep() {
+  tone(1245, 0, 0.09, 0.2);
+}

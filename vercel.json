@@ -9,6 +9,10 @@
       "destination": "https://api.netdc.uz/api/:path*"
     },
     {
+      "source": "/ext/upc/:path*",
+      "destination": "https://api.upcitemdb.com/prod/trial/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

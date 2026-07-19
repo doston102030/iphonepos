@@ -10,6 +10,11 @@ import { useEffect, useState } from 'react';
  * therefore the tallest visual viewport seen so far, re-learned after a
  * rotation (otherwise portrait height would read landscape as "keyboard open").
  */
+function editableFocused(): boolean {
+  const el = document.activeElement;
+  return !!el && el.matches('input, textarea, select, [contenteditable]');
+}
+
 export default function useKeyboardOpen(): boolean {
   const [open, setOpen] = useState(false);
 
@@ -17,18 +22,27 @@ export default function useKeyboardOpen(): boolean {
     const vv = window.visualViewport;
     if (!vv) return;
     let base = vv.height;
-    const onResize = () => {
+    const recompute = () => {
       base = Math.max(base, vv.height);
-      setOpen(base - vv.height > 150);
+      // Height alone lies inside Telegram (the webview shrinks for its own
+      // chrome too) — a keyboard is only "open" if a field actually has focus.
+      setOpen(base - vv.height > 150 && editableFocused());
     };
     const onOrientation = () => {
       base = 0;
     };
-    vv.addEventListener('resize', onResize);
+    // focus moves and viewport resizes race each other; a small delay lets
+    // both settle before deciding.
+    const recomputeSoon = () => setTimeout(recompute, 80);
+    vv.addEventListener('resize', recompute);
     window.addEventListener('orientationchange', onOrientation);
+    window.addEventListener('focusin', recomputeSoon);
+    window.addEventListener('focusout', recomputeSoon);
     return () => {
-      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('resize', recompute);
       window.removeEventListener('orientationchange', onOrientation);
+      window.removeEventListener('focusin', recomputeSoon);
+      window.removeEventListener('focusout', recomputeSoon);
     };
   }, []);
 

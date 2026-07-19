@@ -27,7 +27,9 @@ import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import { PaginationControls } from '@/components/common/PaginationControls';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
+import { MoneyInput } from '@/components/common/MoneyInput';
 import { useIsMobile } from '@/hooks/use-mobile';
+import useBarcodeName from '@/hooks/use-barcode-name';
 import {
   productsApi, LOW_STOCK_THRESHOLD,
   type OutflowReason, type ProductResponse, type StockMovementResponse,
@@ -139,6 +141,16 @@ function ProductDialog({
   const sellPrice = form.watch('price');
   const marginPct = sellPrice > 0 ? Math.round(((sellPrice - purchasePrice) / sellPrice) * 1000) / 10 : 0;
 
+  // A scanned barcode fetches the product's name from the world databases and
+  // fills the empty Nomi field — only for NEW products; an existing product's
+  // name is the shop's own wording and is left alone.
+  useBarcodeName(
+    form.watch('barcode'),
+    open && !product,
+    () => form.getValues('name') ?? '',
+    name => form.setValue('name', name, { shouldValidate: true }),
+  );
+
   async function onSubmit(values: ProductForm) {
     try {
       if (product) {
@@ -197,7 +209,7 @@ function ProductDialog({
                   <div className="flex items-center gap-3">
                     <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Kelish narxi</FormLabel>
                     <FormControl>
-                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...numberFieldProps(field)} />
+                      <MoneyInput className={ROW_INPUT_CLASS} value={field.value} onChange={field.onChange} />
                     </FormControl>
                   </div>
                   <FormMessage className="text-right" />
@@ -208,7 +220,7 @@ function ProductDialog({
                   <div className="flex items-center gap-3">
                     <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Sotish narxi</FormLabel>
                     <FormControl>
-                      <Input type="number" inputMode="numeric" placeholder="0" className={ROW_INPUT_CLASS} {...numberFieldProps(field)} />
+                      <MoneyInput className={ROW_INPUT_CLASS} value={field.value} onChange={field.onChange} />
                     </FormControl>
                   </div>
                   <FormMessage className="text-right" />
@@ -396,6 +408,14 @@ function ReceiveDialog({ open, onOpenChange, onSaved }: {
     if (open) form.reset({ barcode: '', name: '', quantity: 1, purchasePrice: 0, price: 0 });
   }, [open, form]);
 
+  // Same auto-name as the create dialog: scan the box, the name arrives.
+  useBarcodeName(
+    form.watch('barcode'),
+    open,
+    () => form.getValues('name') ?? '',
+    name => form.setValue('name', name, { shouldValidate: true }),
+  );
+
   async function onSubmit(values: ReceiveForm) {
     try {
       await productsApi.receive(values);
@@ -439,14 +459,14 @@ function ReceiveDialog({ open, onOpenChange, onSaved }: {
               <FormField control={form.control} name="purchasePrice" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="font-semibold text-muted-foreground">Kelish narxi</FormLabel>
-                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={0} {...numberFieldProps(field)} /></FormControl>
+                  <FormControl><MoneyInput className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" value={field.value} onChange={field.onChange} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="price" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="font-semibold text-muted-foreground">Sotish narxi</FormLabel>
-                  <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={0} {...numberFieldProps(field)} /></FormControl>
+                  <FormControl><MoneyInput className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" value={field.value} onChange={field.onChange} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

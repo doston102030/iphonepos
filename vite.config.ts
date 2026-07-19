@@ -28,6 +28,20 @@ export default defineConfig({
   server: {
     host: true,
     proxy: {
+      // UPCitemdb (barcode → product name) refuses browser CORS; this makes the
+      // call look server-to-server. Prod does the same via a vercel.json rewrite.
+      "/ext/upc": {
+        target: "https://api.upcitemdb.com",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/upc/, "/prod/trial"),
+        configure(proxy) {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.removeHeader("origin");
+            proxyReq.removeHeader("referer");
+          });
+        },
+      },
       "/api": {
         target: API_TARGET,
         changeOrigin: true,

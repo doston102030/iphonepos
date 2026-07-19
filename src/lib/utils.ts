@@ -63,13 +63,26 @@ export function formatDate(dateStr: string): string {
   }
 }
 
+/**
+ * Human time, not a timestamp: "Bugun 19:58", "Kecha 00:32", "15-iyul, 00:32"
+ * (year appears only when it isn't this year). A cashier scanning a receipt
+ * list reads "Bugun" instantly; "19/07/2026, 19:58" they have to parse.
+ */
 export function formatDateTime(dateStr: string): string {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleString('uz-UZ', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit',
-    });
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    const now = new Date();
+    const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const dayStart = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diffDays = Math.round((dayStart(now) - dayStart(d)) / 86_400_000);
+    if (diffDays === 0) return `Bugun ${time}`;
+    if (diffDays === 1) return `Kecha ${time}`;
+    const day = `${d.getDate()}-${UZ_MONTHS[d.getMonth()]}`;
+    return d.getFullYear() === now.getFullYear()
+      ? `${day}, ${time}`
+      : `${day} ${d.getFullYear()}, ${time}`;
   } catch {
     return dateStr;
   }
