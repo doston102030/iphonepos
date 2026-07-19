@@ -5,7 +5,7 @@ import { Logo } from '@/components/common/Logo';
 
 export default function NotFound() {
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-6 px-6 pt-[calc(2.5rem+var(--inset-top))] pb-[calc(2.5rem+var(--inset-bottom))] text-center bg-background">
+    <div className="min-h-app flex flex-col items-center justify-center gap-6 px-6 pt-[calc(2.5rem+var(--inset-top))] pb-[calc(2.5rem+var(--inset-bottom))] text-center bg-background">
       <Logo className="h-8" />
 
       <div className="h-20 w-20 rounded-3xl bg-muted flex items-center justify-center">

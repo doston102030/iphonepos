@@ -266,6 +266,19 @@
     bottom: calc(var(--bottom-nav-h) + 0.5rem);
   }
 
+  /* Full-app height that holds still. In a browser this is plain 100dvh.
+     Inside Telegram the webview is resized frame-by-frame during the launch
+     expand() animation and every Android keyboard show/hide, and 100dvh tracks
+     each intermediate frame — the whole shell (and its bottom dock) visibly
+     hops. Telegram's script publishes a height that only updates once the
+     webview settles; use it there, keep dvh everywhere else. */
+  .h-app { height: 100dvh; }
+  .min-h-app { min-height: 100dvh; }
+  .max-h-app { max-height: 100dvh; }
+  .tg-app .h-app { height: var(--tg-viewport-stable-height, 100dvh); }
+  .tg-app .min-h-app { min-height: var(--tg-viewport-stable-height, 100dvh); }
+  .tg-app .max-h-app { max-height: var(--tg-viewport-stable-height, 100dvh); }
+
   /* Telegram's iOS webview intermittently composites backdrop-filter from
      stale GPU tiles — screenshot-like garbage smeared over the glass surfaces
      (seen on the nav dock in the wild). Inside Telegram (html.tg-app, set in

@@ -6,6 +6,7 @@ import {
   ChevronRight, ChevronLeft, Sun, Moon, TrendingUp, Receipt, Boxes,
 } from 'lucide-react';
 import useGoBack from '@/hooks/use-go-back';
+import useKeyboardOpen from '@/hooks/use-keyboard-open';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/common/Logo';
@@ -313,6 +314,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [unpaidDebtsCount, setUnpaidDebtsCount] = useState(debtCountCache?.count ?? 0);
   const { user } = useAuth();
   const { totalCount } = useCart();
+  // On Android (and Telegram's Android webview) the keyboard resizes the
+  // webview, parking the dock right on top of it — dead chrome over whatever
+  // the user is typing about. Step aside until the keyboard goes.
+  const keyboardOpen = useKeyboardOpen();
 
   useEffect(() => {
     if (debtCountCache && Date.now() - debtCountCache.at < DEBT_COUNT_TTL_MS) {
@@ -335,7 +340,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="flex h-[100dvh] w-full bg-muted/30 justify-center overflow-hidden">
+    <div className="flex h-app w-full bg-muted/30 justify-center overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar shrink-0 z-20 shadow-xl">
         <SidebarContent />
@@ -374,12 +379,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             {children}
           </div>
         </main>
-        <div className="md:hidden">
-          <MobileBottomNav
-            cartCount={totalCount}
-            unpaidDebtsCount={unpaidDebtsCount}
-          />
-        </div>
+        {!keyboardOpen && (
+          <div className="md:hidden">
+            <MobileBottomNav
+              cartCount={totalCount}
+              unpaidDebtsCount={unpaidDebtsCount}
+            />
+          </div>
+        )}
         <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
       </div>
     </div>

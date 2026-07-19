@@ -8,7 +8,7 @@ import { homePathFor } from '@/routes';
 /** Shown for the moment it takes to verify a stored token against the server. */
 function BootSplash() {
   return (
-    <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
+    <div className="flex h-app w-full items-center justify-center bg-background">
       <Logo className="h-8 animate-pulse" />
     </div>
   );

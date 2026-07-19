@@ -28,7 +28,7 @@ export function MobileOverlay({
           // `sm:p-0` is load-bearing: DialogContent ships `p-5 sm:p-6`, and a
           // bare `p-0` only cancels the unprefixed half, leaving 24px of inset
           // on tablets and up.
-          'h-[100dvh] max-h-[100dvh] bg-background border-0 md:border-l md:border-border rounded-none p-0 sm:p-0 gap-0 overflow-hidden shadow-2xl',
+          'h-app max-h-app bg-background border-0 md:border-l md:border-border rounded-none p-0 sm:p-0 gap-0 overflow-hidden shadow-2xl',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
           'md:data-[state=closed]:slide-out-to-right md:data-[state=open]:slide-in-from-right',

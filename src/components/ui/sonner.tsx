@@ -14,6 +14,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // Top of the screen, where a thumb on the bottom nav can't cover it, and
       // coloured by kind so a green "done" reads at a glance.
       position="top-center"
+      // sonner's own top offset is a bare 24px/16px with no safe-area maths, so
+      // toasts rendered under the iPhone notch in a PWA and under Telegram's
+      // floating buttons in a mini app. --inset-top covers both hosts.
+      offset={{ top: 'calc(var(--inset-top, 0px) + 24px)' }}
+      mobileOffset={{ top: 'calc(var(--inset-top, 0px) + 16px)' }}
       richColors
       className="toaster group"
       toastOptions={{

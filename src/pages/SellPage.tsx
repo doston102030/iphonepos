@@ -12,6 +12,7 @@ import {
   Form, FormControl, FormField, FormItem, FormMessage
 } from '@/components/ui/form';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
+import useKeyboardOpen from '@/hooks/use-keyboard-open';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -524,6 +525,10 @@ export default function SellPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [gridEditProduct, setGridEditProduct] = useState<ProductResponse | null>(null);
   const { totalCount, totalPrice, addItem, quantityOf } = useCart();
+  // While the cashier types in search, the fixed checkout pill would park
+  // itself right above the keyboard (Android resizes the webview under it),
+  // covering the very results being searched — step aside until typing ends.
+  const keyboardOpen = useKeyboardOpen();
 
   // Nothing sold out belongs on a till screen — you cannot sell it, and it only
   // pushes the sellable products further down the grid. The server has no
@@ -625,7 +630,7 @@ export default function SellPage() {
         </div>
       </div>
 
-      {totalCount > 0 && (
+      {totalCount > 0 && !keyboardOpen && (
         <button
           type="button"
           onClick={() => setCheckoutOpen(true)}

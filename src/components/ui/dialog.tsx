@@ -36,7 +36,12 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid max-h-[90dvh] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-2xl border bg-background p-5 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:p-6",
+        // Phones anchor to the upper part of the screen, not dead center: a
+        // centered dialog puts its inputs exactly where the keyboard lands, so
+        // iOS pans the whole webview (and, inside Telegram, often leaves it
+        // stuck panned). Anchored high, the input is already above the
+        // keyboard and no pan is ever triggered. sm+ keeps the classic center.
+        "fixed left-[50%] top-[8%] z-50 grid max-h-[90dvh] w-full max-w-lg translate-x-[-50%] translate-y-0 sm:top-[50%] sm:translate-y-[-50%] gap-4 overflow-y-auto rounded-2xl border bg-background p-5 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=open]:slide-in-from-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%] sm:data-[state=open]:slide-in-from-top-[48%] sm:p-6",
         className
       )}
       {...props}

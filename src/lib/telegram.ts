@@ -43,6 +43,22 @@ export function insideTelegram(): boolean {
 
 /** Call once at boot, before React renders. Safe to call anywhere. */
 export function initTelegram(): void {
+  // Unconditional, not Telegram-only: iOS WebKit (Telegram webview AND
+  // home-screen PWA) pans the whole window up to reveal a keyboard-covered
+  // input even though this app has zero body scroll range — and often never
+  // pans back after the keyboard closes, leaving the POS shifted with the dock
+  // half off-screen and no way to drag it back. Restore the origin whenever
+  // focus leaves form fields entirely; the delay lets focus land on the next
+  // field first so tabbing between inputs doesn't jerk the page.
+  window.addEventListener('focusout', () => {
+    setTimeout(() => {
+      const el = document.activeElement;
+      if (!(el instanceof HTMLElement) || !el.matches('input, textarea, select, [contenteditable]')) {
+        window.scrollTo(0, 0);
+      }
+    }, 100);
+  });
+
   if (!insideTelegram()) return;
   const wa = window.Telegram!.WebApp!;
   try {
