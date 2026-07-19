@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Plus, Search, Pencil, Trash2, RefreshCw, PackageCheck, History, PackageMinus } from 'lucide-react';
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Plus, Search, Pencil, Trash2, RefreshCw, History, PackageMinus } from 'lucide-react';
 import { toast } from 'sonner';
 import { notify } from '@/lib/notify';
 import { useForm } from 'react-hook-form';
@@ -50,6 +50,41 @@ import {
 // caret and the last typed letter sat clipped against the input's edge.
 const ROW_INPUT_CLASS = 'flex-1 min-w-0 border-0 shadow-none text-right p-0 pl-2 pr-1 h-auto text-sm font-semibold focus-visible:ring-0 bg-transparent';
 
+// A single-line row input slid a long product name out of view past its left
+// edge; this one-row textarea wraps and grows downward instead, so the whole
+// name stays readable while it is typed. Names are one line of text — Enter is
+// swallowed and pasted newlines become spaces.
+const NAME_INPUT_CLASS = 'flex-1 min-w-0 border-0 outline-none text-right p-0 pl-2 pr-1 text-sm font-semibold bg-transparent resize-none overflow-hidden leading-snug placeholder:text-muted-foreground';
+
+const NameInput = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  function NameInput({ onChange, ...props }, ref) {
+    const inner = useRef<HTMLTextAreaElement | null>(null);
+    useLayoutEffect(() => {
+      const el = inner.current;
+      if (!el) return;
+      el.style.height = '0px';
+      el.style.height = `${el.scrollHeight}px`;
+    });
+    return (
+      <textarea
+        {...props}
+        ref={el => {
+          inner.current = el;
+          if (typeof ref === 'function') ref(el);
+          else if (ref) ref.current = el;
+        }}
+        rows={1}
+        onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
+        onChange={e => {
+          e.target.value = e.target.value.replace(/\n+/g, ' ');
+          onChange?.(e);
+        }}
+        className={NAME_INPUT_CLASS}
+      />
+    );
+  }
+);
+
 // A number field that shows nothing (not "0") when empty, so typing "50" gives
 // 50 — not "500", which is what a stuck leading zero produced. An emptied field
 // reads back as 0, and the schema's min() rules reject it where that's illegal.
@@ -89,18 +124,9 @@ const outflowSchema = z.object({
   reason: z.enum(['DAMAGED', 'LOST', 'RETURNED'], { required_error: 'Sabab tanlanishi shart' }),
 });
 
-const receiveSchema = z.object({
-  barcode: z.string().min(1, 'Shtrix-kod kiritilishi shart'),
-  name: z.string().optional(),
-  purchasePrice: z.coerce.number().min(0, 'Kelish narxi kiritilishi shart'),
-  price: z.coerce.number().min(0, 'Sotish narxi kiritilishi shart'),
-  quantity: z.coerce.number().min(1, 'Miqdor 1 dan katta bo\'lishi kerak'),
-});
-
 type ProductForm = z.infer<typeof productSchema>;
 type RestockForm = z.infer<typeof restockSchema>;
 type OutflowForm = z.infer<typeof outflowSchema>;
-type ReceiveForm = z.infer<typeof receiveSchema>;
 
 // ── Dialogs ────────────────────────────────────────────────────────────────────
 function ProductDialog({
@@ -178,11 +204,10 @@ function ProductDialog({
             <div className="rounded-2xl border-0 bg-muted/30 shadow-sm overflow-hidden mb-6">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="space-y-0.5 px-4 py-3 border-b border-border/50">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-20">Nomi</FormLabel>
                     <FormControl>
-                      <Input placeholder="Masalan: Coca-Cola 0.5L" autoComplete="off"
-                        className={ROW_INPUT_CLASS} {...field} />
+                      <NameInput placeholder="Masalan: Coca-Cola 0.5L" autoComplete="off" {...field} />
                     </FormControl>
                   </div>
                   <FormMessage className="text-right" />
@@ -237,18 +262,28 @@ function ProductDialog({
                   <FormMessage className="text-right" />
                 </FormItem>
               )} />
-              <div className="flex items-center gap-3 px-4 py-3">
-                <span className="shrink-0 text-sm font-medium text-muted-foreground w-28">O'lchov birligi</span>
-                <Select value={unit} onValueChange={v => setUnit(v as Unit)}>
-                  <SelectTrigger className="flex-1 min-w-0 justify-end gap-1.5 border-0 shadow-none bg-transparent p-0 h-auto text-sm font-semibold focus:ring-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="end">
-                    {UNITS.map(u => (
-                      <SelectItem key={u} value={u}>{UNIT_LABELS[u]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Chips instead of a dropdown: all seven units are visible at
+                  once and one tap picks — no popup list to open and close. */}
+              <div className="px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground">O'lchov birligi</span>
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {UNITS.map(u => (
+                    <button
+                      key={u}
+                      type="button"
+                      aria-pressed={u === unit}
+                      onClick={() => setUnit(u)}
+                      className={cn(
+                        'h-9 px-3.5 rounded-full text-[13px] font-semibold transition-colors press',
+                        u === unit
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-background text-muted-foreground border border-border/60'
+                      )}
+                    >
+                      {UNIT_LABELS[u]}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             {sellPrice > 0 && (
@@ -396,96 +431,6 @@ function OutflowDialog({
   );
 }
 
-function ReceiveDialog({ open, onOpenChange, onSaved }: {
-  open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void;
-}) {
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const form = useForm<ReceiveForm>({
-    resolver: zodResolver(receiveSchema),
-    defaultValues: { barcode: '', name: '', quantity: 1, purchasePrice: 0, price: 0 },
-  });
-  useEffect(() => {
-    if (open) form.reset({ barcode: '', name: '', quantity: 1, purchasePrice: 0, price: 0 });
-  }, [open, form]);
-
-  // Same auto-name as the create dialog: scan the box, the name arrives.
-  useBarcodeName(
-    form.watch('barcode'),
-    open,
-    () => form.getValues('name') ?? '',
-    name => form.setValue('name', name, { shouldValidate: true }),
-  );
-
-  async function onSubmit(values: ReceiveForm) {
-    try {
-      await productsApi.receive(values);
-      notify.success('Tovar qabul qilindi');
-      onSaved(); onOpenChange(false);
-    } catch (err) { notify.error(err instanceof Error ? err.message : 'Xato'); }
-  }
-
-  return (
-    <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Tovar qabul qilish`}>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
-          <div className="flex-1 space-y-4">
-            <FormField control={form.control} name="barcode" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-semibold text-muted-foreground">Shtrix-kod</FormLabel>
-                <FormControl>
-                  <div className="flex gap-2">
-                    <Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4 flex-1" placeholder="123456789" autoComplete="off" {...field} />
-                    <ScanButton onClick={() => setScannerOpen(true)} className="shrink-0 h-14 w-14 rounded-2xl bg-muted/30 shadow-sm" />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-semibold text-muted-foreground">Nomi (ixtiyoriy)</FormLabel>
-                <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" placeholder="Mahsulot nomi" autoComplete="off" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="quantity" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-semibold text-muted-foreground">Miqdor</FormLabel>
-                <FormControl><Input className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" type="number" inputMode="numeric" min={1} {...numberFieldProps(field)} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="purchasePrice" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-semibold text-muted-foreground">Kelish narxi</FormLabel>
-                  <FormControl><MoneyInput className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" value={field.value} onChange={field.onChange} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="price" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-semibold text-muted-foreground">Sotish narxi</FormLabel>
-                  <FormControl><MoneyInput className="h-14 bg-muted/30 border-border/50 shadow-sm rounded-2xl text-lg px-4" value={field.value} onChange={field.onChange} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
-          </div>
-          <div className="pt-6 pb-8 mt-auto">
-            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>Qabul qilish</Button>
-          </div>
-        </form>
-      </Form>
-      <BarcodeScannerDialog
-        open={scannerOpen}
-        onOpenChange={setScannerOpen}
-        onDetected={code => form.setValue('barcode', code, { shouldValidate: true })}
-      />
-    </MobileOverlay>
-  );
-}
-
 function HistoryDialog({ open, onOpenChange, product }: {
   open: boolean; onOpenChange: (v: boolean) => void; product: ProductResponse | null;
 }) {
@@ -554,7 +499,6 @@ export default function ProductsPage() {
   const [outflowOpen, setOutflowOpen] = useState(false);
   const [historyProduct, setHistoryProduct] = useState<ProductResponse | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [receiveOpen, setReceiveOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const isMobile = useIsMobile();
 
@@ -613,16 +557,10 @@ export default function ProductsPage() {
           title="Mahsulotlar"
           description="Mahsulotlar ro'yxati va boshqaruvi"
           action={
-            <div className="flex gap-2">
-              <Button variant="outline" aria-label="Qabul qilish" onClick={() => setReceiveOpen(true)}>
-                <PackageCheck className="h-4 w-4" />
-                <span className="hidden sm:inline">Qabul qilish</span>
-              </Button>
-              <Button aria-label="Yangi mahsulot" onClick={() => { setEditProduct(null); setProductDialogOpen(true); }}>
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Yangi mahsulot</span>
-              </Button>
-            </div>
+            <Button aria-label="Yangi mahsulot" onClick={() => { setEditProduct(null); setProductDialogOpen(true); }}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Yangi mahsulot</span>
+            </Button>
           }
         />
 
@@ -804,7 +742,6 @@ export default function ProductsPage() {
       <RestockDialog open={restockOpen} onOpenChange={setRestockOpen} product={restockProduct} onSaved={load} />
       <OutflowDialog open={outflowOpen} onOpenChange={setOutflowOpen} product={outflowProduct} onSaved={load} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} product={historyProduct} />
-      <ReceiveDialog open={receiveOpen} onOpenChange={setReceiveOpen} onSaved={load} />
 
       <AlertDialog open={deleteId !== null} onOpenChange={o => !o && setDeleteId(null)}>
         <AlertDialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
