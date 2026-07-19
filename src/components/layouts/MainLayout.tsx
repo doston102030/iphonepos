@@ -343,23 +343,30 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
       {/* Main Content Area */}
       <div className="flex-1 w-full flex flex-col bg-background relative md:max-w-none max-w-[430px] mx-auto md:mx-0 sm:border-x md:border-none sm:border-border sm:shadow-2xl md:shadow-none overflow-hidden transition-all duration-300">
-        <header className="md:hidden flex items-center justify-between gap-3 px-4 h-14 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30 safe-area-top">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Logo className="h-6" />
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {user && (
-              <button
-                type="button"
-                aria-label="Menyu"
-                onClick={() => setMoreOpen(true)}
-                className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center transition-colors hover:bg-primary/20 press"
-              >
-                <span className="text-xs font-bold text-primary">
-                  {user.fullName?.[0]?.toUpperCase()}
-                </span>
-              </button>
-            )}
+        {/* safe-area-top lives on the <header>, the fixed h-14 on an inner row
+            (the MobileOverlay pattern). Both on one element is a trap: with
+            border-box sizing the inset padding eats the 56px box instead of
+            growing it, so inside Telegram the page title slid up under the
+            floating Закрыть/menu pills. */}
+        <header className="md:hidden border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30 safe-area-top">
+          <div className="flex items-center justify-between gap-3 px-4 h-14">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Logo className="h-6" />
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {user && (
+                <button
+                  type="button"
+                  aria-label="Menyu"
+                  onClick={() => setMoreOpen(true)}
+                  className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center transition-colors hover:bg-primary/20 press"
+                >
+                  <span className="text-xs font-bold text-primary">
+                    {user.fullName?.[0]?.toUpperCase()}
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto overscroll-contain pb-nav md:pb-0">

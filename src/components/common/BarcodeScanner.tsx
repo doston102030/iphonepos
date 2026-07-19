@@ -261,7 +261,9 @@ export function BarcodeScannerDialog({
             </>
           )}
         </div>
-        <div className="shrink-0 px-6 py-6 pb-8 bg-black text-center safe-area-bottom">
+        {/* One calc'd padding, not pb-8 + safe-area-bottom — both set
+            padding-bottom, so one silently loses. */}
+        <div className="shrink-0 px-6 pt-6 pb-[calc(2rem+var(--inset-bottom))] bg-black text-center">
           {error ? (
             <p className="text-sm text-red-400 font-medium">{error}</p>
           ) : (

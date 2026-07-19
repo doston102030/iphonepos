@@ -266,6 +266,20 @@
     bottom: calc(var(--bottom-nav-h) + 0.5rem);
   }
 
+  /* Telegram's iOS webview intermittently composites backdrop-filter from
+     stale GPU tiles — screenshot-like garbage smeared over the glass surfaces
+     (seen on the nav dock in the wild). Inside Telegram (html.tg-app, set in
+     src/lib/telegram.ts) the glass goes solid; browsers/PWA keep the blur. */
+  .tg-app [class*='backdrop-blur'] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .tg-app .bg-background\/70,
+  .tg-app .bg-background\/80,
+  .tg-app .bg-background\/90 {
+    background-color: hsl(var(--background)) !important;
+  }
+
   .scrollbar-none {
     -ms-overflow-style: none;
     scrollbar-width: none;

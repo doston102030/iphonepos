@@ -88,7 +88,7 @@ export default function LoginPage() {
   }, [press, backspace, loading]);
 
   return (
-    <div className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden bg-background px-6 py-8 safe-area-top safe-area-bottom">
+    <div className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden bg-background px-6 pt-[calc(2rem+var(--inset-top))] pb-[calc(2rem+var(--inset-bottom))]">
       {/* Soft ambient glow so the card doesn't float on a flat grey void.
           Desktop-only: on mobile the sheet fills the screen and hides it anyway. */}
       <div aria-hidden className="pointer-events-none absolute inset-0 hidden sm:block">
