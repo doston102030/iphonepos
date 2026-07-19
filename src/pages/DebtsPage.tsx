@@ -220,20 +220,25 @@ function PaymentHistoryDialog({
 }: {
   open: boolean; onOpenChange: (v: boolean) => void; debt: DebtResponse | null;
 }) {
-  const [payments, setPayments] = useState<DebtPaymentResponse[]>([]);
+  // null = load failed: a PARTIAL debt plainly has payments, so a fetch error
+  // must not leave the dialog claiming "hali to'lov qilinmagan".
+  const [payments, setPayments] = useState<DebtPaymentResponse[] | null>([]);
   const [loading, setLoading] = useState(false);
 
+  const fetchPayments = useCallback(() => {
+    if (!debt) return;
+    setPayments([]);
+    setLoading(true);
+    debtsApi.getPayments(debt.id)
+      .then(setPayments)
+      .catch(() => setPayments(null))
+      .finally(() => setLoading(false));
+  }, [debt]);
+
   useEffect(() => {
-    if (open && debt) {
-      setLoading(true);
-      debtsApi.getPayments(debt.id)
-        .then(setPayments)
-        .catch(() => toast.error("To'lovlar tarixi yuklanmadi"))
-        .finally(() => setLoading(false));
-    } else {
-      setPayments([]);
-    }
-  }, [open, debt]);
+    if (open) fetchPayments();
+    else setPayments([]);
+  }, [open, fetchPayments]);
 
   return (
     <MobileOverlay open={open} onOpenChange={onOpenChange} title="To'lovlar tarixi">
@@ -258,6 +263,11 @@ function PaymentHistoryDialog({
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-2xl" />)}
+          </div>
+        ) : payments === null ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground text-sm mb-3">To'lovlar tarixi yuklanmadi</p>
+            <Button variant="outline" size="sm" className="press" onClick={fetchPayments}>Qayta urinish</Button>
           </div>
         ) : payments.length === 0 ? (
           <p className="text-center py-8 text-muted-foreground text-sm">Hali to'lov qilinmagan</p>
@@ -427,7 +437,7 @@ export default function DebtsPage() {
               type="button"
               onClick={() => setStatusFilter(tab.value)}
               className={cn(
-                'flex-1 min-w-0 h-10 px-2 rounded-xl text-[13px] font-semibold transition-colors truncate press border',
+                'flex-1 min-w-0 h-10 px-1 rounded-xl text-xs min-[360px]:text-[13px] font-semibold transition-colors truncate press border',
                 statusFilter === tab.value
                   ? 'bg-card text-foreground border-border shadow-sm'
                   : 'text-muted-foreground border-transparent'

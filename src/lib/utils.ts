@@ -55,7 +55,11 @@ export function uzDayLabel(dateStr: string): string {
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('uz-UZ', {
+    const d = new Date(dateStr);
+    // An invalid date does not throw — toLocaleDateString happily prints the
+    // English words "Invalid Date", so the catch alone never fires.
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('uz-UZ', {
       year: 'numeric', month: '2-digit', day: '2-digit',
     });
   } catch {

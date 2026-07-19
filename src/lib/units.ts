@@ -25,6 +25,14 @@ const STORAGE_KEY = 'inpos.productUnits';
 // re-reading localStorage JSON for every row of every render adds up.
 let cache: Record<string, Unit> | null = null;
 
+// Another tab changing a unit must not leave this one serving the old word
+// forever (the app supports multi-tab: AuthContext syncs logout the same way).
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', e => {
+    if (e.key === STORAGE_KEY) cache = null;
+  });
+}
+
 function readMap(): Record<string, Unit> {
   if (cache) return cache;
   try {

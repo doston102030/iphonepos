@@ -148,7 +148,9 @@ function UserDialog({
 }
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<UserResponse[]>([]);
+  // null = the load FAILED — "no users" may only come from a successful
+  // empty response, never from a network error.
+  const [users, setUsers] = useState<UserResponse[] | null>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -179,7 +181,10 @@ export default function UsersPage() {
       setUsers(extractContent(res));
       setTotalPages(pg.totalPages);
       setTotalElements(pg.totalElements);
-    } catch { toast.error('Foydalanuvchilar yuklanmadi'); }
+    } catch {
+      setUsers(null);
+      toast.error('Foydalanuvchilar yuklanmadi');
+    }
     finally { setLoading(false); }
   }, [page]);
 
@@ -240,6 +245,11 @@ export default function UsersPage() {
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="p-4"><Skeleton className="h-14 w-full" /></div>
                   ))
+                ) : users === null ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground text-sm mb-3">Foydalanuvchilar yuklanmadi</p>
+                    <Button variant="outline" size="sm" className="press" onClick={load}>Qayta urinish</Button>
+                  </div>
                 ) : users.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground text-sm">Foydalanuvchi topilmadi</p>
                 ) : users.map(u => (
@@ -305,10 +315,11 @@ export default function UsersPage() {
                         ))}
                       </TableRow>
                     ))
-                  ) : users.length === 0 ? (
+                  ) : users === null ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground text-sm">
-                        Foydalanuvchi topilmadi
+                      <TableCell colSpan={4} className="text-center py-8">
+                        <p className="text-muted-foreground text-sm mb-3">Foydalanuvchilar yuklanmadi</p>
+                        <Button variant="outline" size="sm" className="press" onClick={load}>Qayta urinish</Button>
                       </TableCell>
                     </TableRow>
                   ) : users.map(u => (

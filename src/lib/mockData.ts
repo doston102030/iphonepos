@@ -21,17 +21,21 @@ import type {
 const LOW_STOCK = 5;
 
 // ── Date helpers (everything is relative to "today" so the demo always looks live) ──
+// LOCAL calendar dates, not UTC: the app sends local date strings (utils
+// todayStr), and a sale rung up at 00:30 local must land on today's report —
+// slicing toISOString() put it on yesterday-UTC between midnight and 05:00.
 function daysAgoISO(n: number, hour = 9, minute = 0): string {
   const d = new Date();
-  d.setUTCDate(d.getUTCDate() - n);
-  d.setUTCHours(hour, minute, 0, 0);
+  d.setDate(d.getDate() - n);
+  d.setHours(hour, minute, 0, 0);
   return d.toISOString();
 }
 function dateOnly(iso: string): string {
-  return iso.slice(0, 10);
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function todayDateOnly(): string {
-  return new Date().toISOString().slice(0, 10);
+  return dateOnly(new Date().toISOString());
 }
 
 function paginate<T>(items: T[], page: number, size: number): PagedResponse<T> {
@@ -90,13 +94,18 @@ const EXTERNAL_CATALOGUE: Record<string, { name: string; brand: string }> = {
 };
 
 // ── Stock movements ──────────────────────────────────────────────────────────
-const mockMovements: StockMovementResponse[] = [
-  { id: 1, type: 'IN', productName: 'Coca-Cola 0.5L', quantity: 50, performedBy: SUPER_ADMIN_NAME, reason: 'Yangi partiya', createdAt: daysAgoISO(5, 8) },
-  { id: 2, type: 'SALE', productName: 'Pepsi 1L', quantity: 5, performedBy: CASHIER_NAME, reason: 'Sotildi', createdAt: daysAgoISO(4, 10, 30) },
-  { id: 3, type: 'OUT', productName: 'Non (katta)', quantity: 3, performedBy: CASHIER_NAME, reason: 'Buzilgan', createdAt: daysAgoISO(4, 14) },
-  { id: 4, type: 'IN', productName: 'Suv 1.5L', quantity: 100, performedBy: SUPER_ADMIN_NAME, reason: "Ombor to'ldirish", createdAt: daysAgoISO(3, 9) },
-  { id: 5, type: 'ADJUSTMENT', productName: 'Shakar 1kg', quantity: 2, performedBy: SUPER_ADMIN_NAME, reason: 'Inventarizatsiya', createdAt: daysAgoISO(2, 16) },
-  { id: 6, type: 'SALE', productName: 'Sut 1L', quantity: 3, performedBy: CASHIER_NAME, reason: 'Sotildi', createdAt: daysAgoISO(1, 8, 30) },
+// `productId` is mock-internal (the server's StockMovementResponse carries only
+// the name): restock history must survive a product rename, and two same-named
+// products must not share one history.
+interface MockMovement extends StockMovementResponse { productId: number }
+
+const mockMovements: MockMovement[] = [
+  { id: 1, type: 'IN', productId: 1, productName: 'Coca-Cola 0.5L', quantity: 50, performedBy: SUPER_ADMIN_NAME, reason: 'Yangi partiya', createdAt: daysAgoISO(5, 8) },
+  { id: 2, type: 'SALE', productId: 2, productName: 'Pepsi 1L', quantity: 5, performedBy: CASHIER_NAME, reason: 'Sotildi', createdAt: daysAgoISO(4, 10, 30) },
+  { id: 3, type: 'OUT', productId: 4, productName: 'Non (katta)', quantity: 3, performedBy: CASHIER_NAME, reason: 'Buzilgan', createdAt: daysAgoISO(4, 14) },
+  { id: 4, type: 'IN', productId: 3, productName: 'Suv 1.5L', quantity: 100, performedBy: SUPER_ADMIN_NAME, reason: "Ombor to'ldirish", createdAt: daysAgoISO(3, 9) },
+  { id: 5, type: 'ADJUSTMENT', productId: 7, productName: 'Shakar 1kg', quantity: 2, performedBy: SUPER_ADMIN_NAME, reason: 'Inventarizatsiya', createdAt: daysAgoISO(2, 16) },
+  { id: 6, type: 'SALE', productId: 5, productName: 'Sut 1L', quantity: 3, performedBy: CASHIER_NAME, reason: 'Sotildi', createdAt: daysAgoISO(1, 8, 30) },
 ];
 let nextMovementId = 7;
 
@@ -252,6 +261,12 @@ export const mockUsersApi = {
     return delay(toUserResponse(user));
   },
   create: (body: UserRequest): Promise<UserResponse> => {
+    // The real POST /api/users answers 400 "PIN band" for a taken PIN — and a
+    // duplicate here would leave the new user unable to log in anyway, since
+    // login matches the first user with that PIN.
+    if (mockUsers.some(u => u.pin === body.pin)) {
+      return Promise.reject(new Error('PIN band'));
+    }
     const user: MockUser = {
       id: nextUserId++, pin: body.pin, fullName: body.fullName, role: body.role, active: true,
     };
@@ -261,6 +276,9 @@ export const mockUsersApi = {
   update: (id: number, body: UserUpdateRequest): Promise<UserResponse> => {
     const user = mockUsers.find(u => u.id === id);
     if (!user) return Promise.reject(new Error("Ma'lumot topilmadi."));
+    if (body.pin && mockUsers.some(u => u.pin === body.pin && u.id !== id)) {
+      return Promise.reject(new Error('PIN band'));
+    }
     // An omitted PIN keeps the current one — same as UserUpdateRequest allows.
     if (body.pin) user.pin = body.pin;
     user.fullName = body.fullName;
@@ -281,12 +299,13 @@ export const mockUsersApi = {
 
 // ── PRODUCTS ─────────────────────────────────────────────────────────────────
 function recordMovement(
-  type: StockMovementResponse['type'], productName: string, quantity: number, reason?: string,
+  type: StockMovementResponse['type'], product: ProductResponse, quantity: number, reason?: string,
 ): void {
   mockMovements.push({
     id: nextMovementId++,
     type,
-    productName,
+    productId: product.id,
+    productName: product.name,
     quantity,
     performedBy: SUPER_ADMIN_NAME,
     reason,
@@ -300,8 +319,11 @@ export const mockProductsApi = {
   getAll: (search?: string, page = 0, size = 30): Promise<PagedResponse<ProductResponse>> => {
     let list = [...mockProducts];
     if (search) {
+      // Name only — the real `search` param matches the name, not the barcode
+      // (openapi: "Qidiruv so'zi (mahsulot nomi)"). Matching barcodes here made
+      // digit searches work in demo and come back empty in production.
       const q = search.toLowerCase();
-      list = list.filter(p => p.name.toLowerCase().includes(q) || (p.barcode ?? '').includes(search));
+      list = list.filter(p => p.name.toLowerCase().includes(q));
     }
     return delay(paginate(list, page, size));
   },
@@ -346,7 +368,7 @@ export const mockProductsApi = {
     if (!product) return Promise.reject(new Error('Mahsulot topilmadi.'));
     if (body.quantity <= 0) return Promise.reject(new Error("Miqdor 0 dan katta bo'lishi kerak."));
     product.stockQuantity += body.quantity;
-    recordMovement('IN', product.name, body.quantity, "Qayta to'ldirish");
+    recordMovement('IN', product, body.quantity, "Qayta to'ldirish");
     return delay({ ...product });
   },
   createOutflow: (id: number, body: OutflowRequest): Promise<OutflowResponse> => {
@@ -357,7 +379,7 @@ export const mockProductsApi = {
       return Promise.reject(new Error('Ombordagi qoldiq yetarli emas'));
     }
     product.stockQuantity -= body.quantity;
-    recordMovement('OUT', product.name, body.quantity, OUTFLOW_LABELS[body.reason]);
+    recordMovement('OUT', product, body.quantity, OUTFLOW_LABELS[body.reason]);
     return delay<OutflowResponse>({
       id: nextOutflowId++,
       productName: product.name,
@@ -373,7 +395,7 @@ export const mockProductsApi = {
       existing.stockQuantity += body.quantity;
       existing.purchasePrice = body.purchasePrice;
       existing.price = body.price;
-      recordMovement('IN', existing.name, body.quantity, 'Qabul qilindi');
+      recordMovement('IN', existing, body.quantity, 'Qabul qilindi');
       return delay({ ...existing });
     }
     const product: ProductResponse = {
@@ -385,14 +407,12 @@ export const mockProductsApi = {
       stockQuantity: body.quantity,
     };
     mockProducts.push(product);
-    recordMovement('IN', product.name, body.quantity, 'Qabul qilindi');
+    recordMovement('IN', product, body.quantity, 'Qabul qilindi');
     return delay({ ...product });
   },
   restockHistory: (id: number): Promise<StockMovementResponse[]> => {
-    const product = mockProducts.find(p => p.id === id);
-    if (!product) return delay<StockMovementResponse[]>([]);
     const history = mockMovements
-      .filter(m => m.productName === product.name && (m.type === 'IN' || m.type === 'ADJUSTMENT'))
+      .filter(m => m.productId === id && (m.type === 'IN' || m.type === 'ADJUSTMENT'))
       .reverse();
     return delay(history);
   },
@@ -417,7 +437,7 @@ export const mockOrdersApi = {
     const items: OrderItemResponse[] = body.items.map(it => {
       const product = mockProducts.find(p => p.id === it.productId)!;
       product.stockQuantity -= it.quantity;
-      recordMovement('SALE', product.name, it.quantity, 'Sotildi');
+      recordMovement('SALE', product, it.quantity, 'Sotildi');
       return {
         productName: product.name,
         quantity: it.quantity,
@@ -497,12 +517,17 @@ export const mockDebtsApi = {
     const debt = mockDebts.find(d => d.id === id);
     if (!debt) return Promise.reject(new Error("Ma'lumot topilmadi."));
     if (body.amount <= 0) return Promise.reject(new Error("Summa 0 dan katta bo'lishi kerak."));
-    debt.paidAmount = Math.min(debt.amount, debt.paidAmount + body.amount);
+    const remaining = debt.amount - debt.paidAmount;
+    if (remaining <= 0) return Promise.reject(new Error("Qarz allaqachon to'langan."));
+    // The ledger records what was actually applied — recording the raw amount
+    // while clamping paidAmount let the payment history sum past the debt.
+    const applied = Math.min(body.amount, remaining);
+    debt.paidAmount += applied;
     debt.status = debtStatus(debt.amount, debt.paidAmount);
     const payments = mockDebtPayments[id] ?? (mockDebtPayments[id] = []);
     payments.push({
       id: nextPaymentId++,
-      amount: body.amount,
+      amount: applied,
       performedBy: SUPER_ADMIN_NAME,
       createdAt: new Date().toISOString(),
     });
@@ -517,8 +542,16 @@ export const mockStockMovementsApi = {
   getAll: (params?: { from?: string; to?: string; type?: string; page?: number; size?: number }) => {
     let list = [...mockMovements].reverse();
     if (params?.type) list = list.filter(m => m.type === params.type);
-    if (params?.from) list = list.filter(m => dateOnly(m.createdAt) >= params.from!);
-    if (params?.to) list = list.filter(m => dateOnly(m.createdAt) <= params.to!);
+    // Callers pass datetimes ("...T00:00:00"); compare date-to-date, or the
+    // start day itself fails the >= check against its own midnight string.
+    if (params?.from) {
+      const from = params.from.slice(0, 10);
+      list = list.filter(m => dateOnly(m.createdAt) >= from);
+    }
+    if (params?.to) {
+      const to = params.to.slice(0, 10);
+      list = list.filter(m => dateOnly(m.createdAt) <= to);
+    }
     return delay(paginate(list, params?.page ?? 0, params?.size ?? 20));
   },
 };

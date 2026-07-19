@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShoppingCart, Package, CreditCard, TrendingUp,
@@ -98,7 +98,11 @@ export default function DashboardPage() {
   // the `.catch(() => null)` under it left every card rendering a confident 0 —
   // a cashier could not tell "sotuv bo'lmadi" from "server javob bermadi".
   // Whatever does load is shown; whatever fails shows "—" and says so.
+  // Flipping between two dates fires two requests; if the older one lands
+  // last, its KPIs would sit under the newer date chip. Latest request only.
+  const daySeq = useRef(0);
   const loadDay = useCallback(async () => {
+    const seq = ++daySeq.current;
     setDayLoading(true);
     // daily() without a date lets the SERVER pick "today", and its clock may
     // sit on the other side of midnight from the shop's — so the KPI cards and
@@ -108,6 +112,7 @@ export default function DashboardPage() {
       reportsApi.daily(date),
       reportsApi.byUser(date, date),
     ]);
+    if (seq !== daySeq.current) return;
 
     setDay(d.status === 'fulfilled' ? d.value : null);
     setStaffSales(staff.status === 'fulfilled'

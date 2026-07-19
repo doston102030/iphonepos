@@ -25,12 +25,17 @@ export function MobileOverlay({
         aria-describedby={undefined}
         className={cn(
           'fixed inset-x-0 bottom-0 top-0 z-50 flex flex-col w-full max-w-[430px] mx-auto md:mx-0 md:left-auto md:right-0',
-          // `sm:p-0` is load-bearing: DialogContent ships `p-5 sm:p-6`, and a
-          // bare `p-0` only cancels the unprefixed half, leaving 24px of inset
-          // on tablets and up.
+          // The sm:-prefixed halves are load-bearing: DialogContent ships
+          // `p-5 sm:p-6`, `top-[8%] sm:top-[50%]` and sm: slide animations, and
+          // an unprefixed override only cancels the unprefixed half —
+          // tailwind-merge keeps the sm: classes, and at ≥640px they win the
+          // cascade. `sm:top-[50%]` alone pushed every sheet half off-screen
+          // on desktop, submit buttons unreachable.
           'h-app max-h-app bg-background border-0 md:border-l md:border-border rounded-none p-0 sm:p-0 gap-0 overflow-hidden shadow-2xl',
+          'sm:top-0',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
+          'sm:data-[state=closed]:slide-out-to-bottom sm:data-[state=open]:slide-in-from-bottom',
           'md:data-[state=closed]:slide-out-to-right md:data-[state=open]:slide-in-from-right',
           '!translate-x-0 !translate-y-0',
           className

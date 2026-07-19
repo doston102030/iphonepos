@@ -108,19 +108,19 @@ const OUTFLOW_REASONS: OutflowReason[] = ['DAMAGED', 'LOST', 'RETURNED'];
 const productSchema = z.object({
   name: z.string().min(1, 'Nom kiritilishi shart'),
   barcode: z.string().min(1, 'Shtrix-kod kiritilishi shart'),
-  purchasePrice: z.coerce.number().min(0, 'Kelish narxi 0 dan katta bo\'lishi kerak'),
-  price: z.coerce.number().min(0, 'Sotish narxi 0 dan katta bo\'lishi kerak'),
-  stockQuantity: z.coerce.number().min(0, 'Miqdor 0 dan katta bo\'lishi kerak'),
+  purchasePrice: z.coerce.number().min(0, 'Kelish narxi manfiy bo\'lmasligi kerak'),
+  price: z.coerce.number().min(0, 'Sotish narxi manfiy bo\'lmasligi kerak'),
+  stockQuantity: z.coerce.number().min(0, 'Miqdor manfiy bo\'lmasligi kerak'),
 });
 
 const restockSchema = z.object({
-  quantity: z.coerce.number().min(1, 'Miqdor 1 dan katta bo\'lishi kerak'),
+  quantity: z.coerce.number().min(1, 'Miqdor kamida 1 bo\'lishi kerak'),
 });
 
 // `note` is optional on the server too, and the three reasons already say what
 // happened — so the form does not ask for it.
 const outflowSchema = z.object({
-  quantity: z.coerce.number().min(1, 'Miqdor 1 dan katta bo\'lishi kerak'),
+  quantity: z.coerce.number().min(1, 'Miqdor kamida 1 bo\'lishi kerak'),
   reason: z.enum(['DAMAGED', 'LOST', 'RETURNED'], { required_error: 'Sabab tanlanishi shart' }),
 });
 
@@ -434,18 +434,24 @@ function OutflowDialog({
 function HistoryDialog({ open, onOpenChange, product }: {
   open: boolean; onOpenChange: (v: boolean) => void; product: ProductResponse | null;
 }) {
-  const [history, setHistory] = useState<StockMovementResponse[]>([]);
+  // null = load failed. Also reset on every open: without it, a failed fetch
+  // for product B kept showing product A's movements under B's title.
+  const [history, setHistory] = useState<StockMovementResponse[] | null>([]);
   const [loading, setLoading] = useState(false);
 
+  const fetchHistory = useCallback(() => {
+    if (!product) return;
+    setHistory([]);
+    setLoading(true);
+    productsApi.restockHistory(product.id)
+      .then(setHistory)
+      .catch(() => setHistory(null))
+      .finally(() => setLoading(false));
+  }, [product]);
+
   useEffect(() => {
-    if (open && product) {
-      setLoading(true);
-      productsApi.restockHistory(product.id)
-        .then(setHistory)
-        .catch(() => toast.error('Tarix yuklanmadi'))
-        .finally(() => setLoading(false));
-    }
-  }, [open, product]);
+    if (open) fetchHistory();
+  }, [open, fetchHistory]);
 
   return (
     <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Tarix — ${product?.name || ''}`}>
@@ -453,6 +459,13 @@ function HistoryDialog({ open, onOpenChange, product }: {
         {loading ? (
           <div className="space-y-3 mt-2">
             {[1,2,3,4].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
+          </div>
+        ) : history === null ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center">
+            <p className="text-muted-foreground text-sm mb-3">Tarix yuklanmadi</p>
+            <Button variant="outline" size="sm" className="press" onClick={fetchHistory}>
+              Qayta urinish
+            </Button>
           </div>
         ) : history.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center opacity-70">
@@ -483,7 +496,9 @@ function HistoryDialog({ open, onOpenChange, product }: {
 
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
-  const [products, setProducts] = useState<ProductResponse[]>([]);
+  // null = the load FAILED — "no products" may only be claimed by a successful
+  // empty response, not by a network error that happened to leave [] behind.
+  const [products, setProducts] = useState<ProductResponse[] | null>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -502,10 +517,15 @@ export default function ProductsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const isMobile = useIsMobile();
 
+  // Two quick page taps fire two requests; the slower (older) one must not
+  // paint its rows under the newer page counter. Only the latest may render.
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const res = await productsApi.getAll(search || undefined, page, 30);
+      if (seq !== loadSeq.current) return;
       const pg = extractPage(res);
       // Deleting the last product on the last page leaves `page` past the end;
       // the refetch then comes back empty and the screen reads "Mahsulot
@@ -518,9 +538,11 @@ export default function ProductsPage() {
       setTotalPages(pg.totalPages);
       setTotalElements(pg.totalElements);
     } catch {
+      if (seq !== loadSeq.current) return;
+      setProducts(null);
       toast.error('Mahsulotlar yuklanmadi');
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [search, page]);
 
@@ -582,6 +604,11 @@ export default function ProductsPage() {
               Array.from({ length: 5 }).map((_, i) => (
                 <Card key={i} className="shadow-sm"><CardContent className="p-4"><Skeleton className="h-16 w-full" /></CardContent></Card>
               ))
+            ) : products === null ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground text-sm mb-3">Mahsulotlar yuklanmadi</p>
+                <Button variant="outline" size="sm" className="press" onClick={load}>Qayta urinish</Button>
+              </div>
             ) : products.length === 0 ? (
               <p className="text-center py-8 text-muted-foreground text-sm">Mahsulot topilmadi</p>
             ) : products.map(p => (
@@ -672,6 +699,13 @@ export default function ProductsPage() {
                           ))}
                         </TableRow>
                       ))
+                    ) : products === null ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">
+                          <p className="text-muted-foreground text-sm mb-3">Mahsulotlar yuklanmadi</p>
+                          <Button variant="outline" size="sm" className="press" onClick={load}>Qayta urinish</Button>
+                        </TableCell>
+                      </TableRow>
                     ) : products.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">

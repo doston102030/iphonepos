@@ -430,11 +430,18 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
                           placeholder="0"
                           {...field}
                           value={field.value === 0 || field.value === undefined ? '' : field.value}
-                          onChange={e => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                          onChange={e => {
+                            // min={0} only disarms the spinner — the keyboard can
+                            // still type "-2000", which failed zod with no message
+                            // anywhere and left "Tasdiqlash" dead mid-sale.
+                            const n = Number(e.target.value);
+                            field.onChange(e.target.value === '' || !Number.isFinite(n) ? 0 : Math.max(0, n));
+                          }}
                         />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium pointer-events-none">so'm</span>
                       </div>
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )} />
               </div>
@@ -538,19 +545,26 @@ export default function SellPage() {
   const sellable = (products ?? []).filter(p => p.stockQuantity > 0);
   const allSoldOut = !!products && products.length > 0 && sellable.length === 0;
 
+  // A broad query ("c") fans out into many page fetches and can land AFTER the
+  // narrow query typed a second later — the till then shows results for "c"
+  // under a search box that says "cola". Only the latest request may render.
+  const loadSeq = useRef(0);
   const load = useCallback(async (q: string) => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const res = await fetchAllPages<ProductResponse>(
         (page, size) => productsApi.getAll(q || undefined, page, size),
       );
+      if (seq !== loadSeq.current) return;
       setProducts(res.items);
       setTruncated(res.truncated);
     } catch {
+      if (seq !== loadSeq.current) return;
       setProducts(null);
       toast.error('Mahsulotlar yuklanmadi');
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, []);
 

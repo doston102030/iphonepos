@@ -16,7 +16,7 @@ import { getProductUnit } from '@/lib/units';
 type StockGroup = 'IN_STOCK' | 'LOW' | 'OUT';
 
 const GROUP_TABS: { value: StockGroup; label: string }[] = [
-  { value: 'IN_STOCK', label: 'Omborda bor' },
+  { value: 'IN_STOCK', label: 'Mavjud' },
   { value: 'LOW', label: 'Kam qolgan' },
   { value: 'OUT', label: 'Tugagan' },
 ];
@@ -118,7 +118,7 @@ export default function StockPage() {
               type="button"
               onClick={() => setGroup(tab.value)}
               className={cn(
-                'flex-1 min-w-0 h-11 px-2 rounded-xl text-[13px] font-semibold transition-colors press border',
+                'flex-1 min-w-0 h-11 px-1 rounded-xl text-xs min-[360px]:text-[13px] font-semibold transition-colors press border',
                 group === tab.value
                   ? 'bg-card text-foreground border-border shadow-sm'
                   : 'text-muted-foreground border-transparent',
