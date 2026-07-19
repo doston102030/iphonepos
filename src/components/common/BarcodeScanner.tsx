@@ -1,23 +1,39 @@
 import { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, Flashlight, FlashlightOff, ZoomIn } from 'lucide-react';
+import { prepareZXingModule, readBarcodes, type ReaderOptions } from 'zxing-wasm/reader';
+import zxingWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url';
 import { Button } from '@/components/ui/button';
 import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { playScanBeep } from '@/lib/sound';
 import { cn } from '@/lib/utils';
 
-const SCANNER_ELEMENT_ID = 'barcode-scanner-viewport';
+// The decode stack, fastest first:
+//   1. Native BarcodeDetector (Android Chrome) — hardware-accelerated, reads
+//      straight off the video element, no pixel copying at all.
+//   2. zxing-wasm (everything else, crucially iPhone) — the C++ ZXing compiled
+//      to WebAssembly. This replaced html5-qrcode's JS decoder, which was the
+//      reason iPhones "never scanned": the wasm build is an order of magnitude
+//      faster and far better at worn, blurred and small (= far away) barcodes.
+// Both paths scan the ENTIRE frame at native camera resolution, so a barcode
+// does not have to sit inside the aiming window — the frame is only a guide.
 
-const SUPPORTED_FORMATS = [
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.EAN_8,
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.UPC_A,
-  Html5QrcodeSupportedFormats.UPC_E,
-  Html5QrcodeSupportedFormats.ITF,
-  Html5QrcodeSupportedFormats.QR_CODE,
-];
+// Ship the wasm with the app bundle instead of zxing's default CDN fetch:
+// a shop tablet with flaky internet must still scan.
+prepareZXingModule({
+  overrides: {
+    locateFile: (path: string, prefix: string) =>
+      path.endsWith('.wasm') ? zxingWasmUrl : prefix + path,
+  },
+});
+
+// tryHarder/tryRotate/tryInvert/tryDownscale all default to true — that
+// combination is what reads a code at arm's length or at an angle.
+const READER_OPTIONS: ReaderOptions = {
+  formats: ['EAN13', 'EAN8', 'Code128', 'Code39', 'UPCA', 'UPCE', 'ITF', 'QRCode'],
+  maxNumberOfSymbols: 1,
+};
+
+const DETECTOR_FORMATS = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'qr_code'];
 
 // torch/zoom/focusMode are real capabilities on Android Chrome and iOS 17+,
 // but TypeScript's lib.dom doesn't know them yet — hence these local shapes.
@@ -31,9 +47,27 @@ interface AdvancedConstraint {
   zoom?: number;
   focusMode?: string;
 }
+interface DetectedBarcode { rawValue: string }
+interface BarcodeDetectorLike { detect(source: CanvasImageSource): Promise<DetectedBarcode[]> }
+interface BarcodeDetectorCtor {
+  new (options?: { formats?: string[] }): BarcodeDetectorLike;
+  getSupportedFormats(): Promise<string[]>;
+}
 
-function applyAdvanced(scanner: Html5Qrcode, constraint: AdvancedConstraint): Promise<void> {
-  return scanner.applyVideoConstraints({ advanced: [constraint] } as unknown as MediaTrackConstraints);
+function applyAdvanced(track: MediaStreamTrack, constraint: AdvancedConstraint): Promise<void> {
+  return track.applyConstraints({ advanced: [constraint] } as unknown as MediaTrackConstraints);
+}
+
+async function createNativeDetector(): Promise<BarcodeDetectorLike | null> {
+  const Ctor = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
+  if (!Ctor) return null;
+  try {
+    const supported = await Ctor.getSupportedFormats();
+    const formats = DETECTOR_FORMATS.filter(f => supported.includes(f));
+    return formats.length > 0 ? new Ctor({ formats }) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function BarcodeScannerDialog({
@@ -49,10 +83,9 @@ export function BarcodeScannerDialog({
   const [torchOn, setTorchOn] = useState(false);
   const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
   const [zoom, setZoom] = useState(1);
-  const containerRef = useRef<HTMLDivElement>(null);
-  // The live scanner, for the torch/zoom controls. Set only after start()
-  // resolves, cleared in the effect's cleanup before teardown begins.
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  // The live camera track, for the torch/zoom controls.
+  const trackRef = useRef<MediaStreamTrack | null>(null);
 
   // Callers pass inline arrows for these, so their identity changes on every
   // parent render. Keeping them in refs lets the camera effect depend only on
@@ -64,59 +97,29 @@ export function BarcodeScannerDialog({
 
   useEffect(() => {
     if (!open) return;
-    let isMounted = true;
-    let scanner: Html5Qrcode | null = null;
-    let started = false;
-    // Cleanup awaits this. Closing the dialog while start() was still negotiating
-    // the stream used to leave `started === false`, so stop() was never called:
-    // the camera stayed live — indicator on, unusable by other apps — and a
-    // second Html5Qrcode was constructed on top of the orphan on the next open.
-    let startup: Promise<void> = Promise.resolve();
+    let alive = true;
+    let stream: MediaStream | null = null;
     setError(null);
     setTorchAvailable(false);
     setTorchOn(false);
     setZoomRange(null);
+    setZoom(1);
 
-    const onSuccess = (decodedText: string) => {
-      if (!isMounted) return;
-      // The supermarket blip: the cashier knows it read without looking.
-      playScanBeep();
-      onDetectedRef.current(decodedText);
-      onOpenChangeRef.current(false);
-    };
-    // The decode window matches the white aiming frame. Full-frame decoding was
-    // tried and is FAST on Android (native BarcodeDetector) but crawls on
-    // iPhone, where WebKit has no BarcodeDetector and the JS decoder must chew
-    // the entire 720p frame every tick — scans took seconds. A bounded region
-    // an iPhone decodes in a few ms. The library's own gray region markers are
-    // hidden via CSS (the overlay frame already shows the window).
-    //
-    // videoConstraints asks for 1280×720: without it the browser hands over
-    // 640×480, which leaves a dense EAN-13 too few pixels per bar to decode —
-    // the single biggest reason worn barcodes "never scan". `ideal` (never
-    // `exact`) so a webcam that can't do 720p still opens at whatever it has.
-    const scanConfig = {
-      fps: 15,
-      qrbox: (vw: number, vh: number) => {
-        const width = Math.floor(Math.min(vw * 0.85, 340));
-        const height = Math.floor(Math.min(width * 0.6, vh * 0.5));
-        return { width, height };
-      },
-    };
-    const hd = { width: { ideal: 1280 }, height: { ideal: 720 } };
+    // Compile the wasm while the camera permission dialog / stream negotiation
+    // runs, so the first frame can decode immediately.
+    prepareZXingModule({ fireImmediately: true }).catch(() => null);
 
-    // After the stream is live: switch to continuous autofocus where the camera
-    // supports it (a fixed-focus start leaves close-up barcodes permanently
-    // blurred on many Androids), and surface torch/zoom controls if the
-    // hardware has them.
-    const readCapabilities = (s: Html5Qrcode): boolean => {
+    // After the stream is live: continuous autofocus where supported (a
+    // fixed-focus start leaves close-up barcodes permanently blurred on many
+    // Androids), then surface torch/zoom controls if the hardware has them.
+    const readCapabilities = (track: MediaStreamTrack): boolean => {
       let caps: TrackCapabilities = {};
       try {
-        caps = s.getRunningTrackCapabilities() as TrackCapabilities;
+        caps = track.getCapabilities() as TrackCapabilities;
       } catch {
         return false;
       }
-      if (!isMounted) return false;
+      if (!alive) return false;
       setTorchAvailable(caps.torch === true);
       if (caps.zoom && caps.zoom.max > caps.zoom.min) {
         setZoomRange({
@@ -128,128 +131,157 @@ export function BarcodeScannerDialog({
       }
       return caps.torch === true || !!caps.zoom;
     };
-    const enhanceTrack = async (s: Html5Qrcode) => {
+    const enhanceTrack = async (track: MediaStreamTrack) => {
       let caps: TrackCapabilities = {};
       try {
-        caps = s.getRunningTrackCapabilities() as TrackCapabilities;
+        caps = track.getCapabilities() as TrackCapabilities;
       } catch {
         return;
       }
       if (caps.focusMode?.includes('continuous')) {
-        await applyAdvanced(s, { focusMode: 'continuous' }).catch(() => null);
+        await applyAdvanced(track, { focusMode: 'continuous' }).catch(() => null);
       }
-      if (!isMounted) return;
+      if (!alive) return;
       // iOS reports torch/zoom late on some devices — if nothing showed up on
       // the first read, ask once more after the track has settled.
-      if (!readCapabilities(s)) {
+      if (!readCapabilities(track)) {
         setTimeout(() => {
-          if (isMounted && scannerRef.current === s) readCapabilities(s);
+          if (alive && trackRef.current === track) readCapabilities(track);
         }, 900);
       }
     };
 
-    // Wait a bit for the overlay animation and DOM to settle.
-    const timer = setTimeout(() => {
-      if (!isMounted || !containerRef.current) return;
-      startup = (async () => {
-      try {
-        scanner = new Html5Qrcode(containerRef.current!.id, {
-          verbose: false,
-          formatsToSupport: SUPPORTED_FORMATS,
-          // Hand decoding to the browser's built-in BarcodeDetector where it
-          // exists (all modern Android Chrome): it reads off the live camera far
-          // faster and locks onto worn or angled barcodes the JS decoder misses.
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-        });
-
-        // Prefer the rear camera, but fall back to the front camera or any
-        // available device — many laptops/desktops only have one camera and
-        // reject an "environment" facingMode constraint outright.
-        try {
-          await scanner.start({ facingMode: 'environment' }, { ...scanConfig, videoConstraints: { facingMode: 'environment', ...hd } }, onSuccess, undefined);
-        } catch {
-          if (!isMounted) return;
-          try {
-            await scanner.start({ facingMode: 'user' }, { ...scanConfig, videoConstraints: { facingMode: 'user', ...hd } }, onSuccess, undefined);
-          } catch {
-            if (!isMounted) return;
-            const cameras = await Html5Qrcode.getCameras().catch(() => []);
-            if (!isMounted) return;
-            if (cameras.length > 0) {
-              await scanner.start(cameras[0].id, scanConfig, onSuccess, undefined);
-            } else {
-              throw new Error('no-camera');
-            }
-          }
-        }
-        // Set even when the dialog has already closed — the stream is live and
-        // somebody has to stop it.
-        started = true;
-        scannerRef.current = scanner;
-        await enhanceTrack(scanner);
-      } catch {
-        if (isMounted) {
-          setError(
-            typeof navigator !== 'undefined' && !navigator.mediaDevices
-              // Chrome/Safari hide the camera API entirely on a non-HTTPS origin,
-              // which is exactly how a shop tablet on a LAN IP is usually opened.
-              ? "Kamera faqat HTTPS orqali ishlaydi. Shtrix-kodni qo'lda kiriting."
-              : "Kameraga ruxsat berilmadi yoki qurilma topilmadi. Shtrix-kodni qo'lda kiriting."
-          );
-        }
+    // One frame, one answer. Native path feeds the video element straight to
+    // the detector; wasm path copies the frame once and hands zxing the pixels.
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const decodeOnce = async (video: HTMLVideoElement, native: BarcodeDetectorLike | null): Promise<string | null> => {
+      if (video.readyState < 2 || video.videoWidth === 0) return null;
+      if (native) {
+        const codes = await native.detect(video).catch(() => [] as DetectedBarcode[]);
+        return codes.find(c => c.rawValue)?.rawValue ?? null;
       }
-      })();
-    }, 150);
+      if (!ctx) return null;
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+      ctx.drawImage(video, 0, 0, w, h);
+      const results = await readBarcodes(ctx.getImageData(0, 0, w, h), READER_OPTIONS).catch(() => []);
+      return results.find(r => r.isValid && r.text)?.text ?? null;
+    };
+
+    (async () => {
+      // Chrome/Safari hide the camera API entirely on a non-HTTPS origin,
+      // which is exactly how a shop tablet on a LAN IP is usually opened.
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Kamera faqat HTTPS orqali ishlaydi. Shtrix-kodni qo'lda kiriting.");
+        return;
+      }
+      try {
+        try {
+          // Full HD, not the 640×480 the browser volunteers: pixels per bar are
+          // what let a dense EAN-13 decode from across the counter. `ideal`
+          // (never `exact`) so a webcam that can't do 1080p still opens, and
+          // `ideal: environment` so single-camera laptops don't reject.
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+      } catch {
+        if (alive) setError("Kameraga ruxsat berilmadi yoki qurilma topilmadi. Shtrix-kodni qo'lda kiriting.");
+        return;
+      }
+      const video = videoRef.current;
+      if (!alive || !video) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+      video.srcObject = stream;
+      trackRef.current = stream.getVideoTracks()[0] ?? null;
+      // play() rejects if the dialog closed mid-negotiation; cleanup handles it.
+      await video.play().catch(() => null);
+      if (!alive) return;
+      if (trackRef.current) void enhanceTrack(trackRef.current);
+
+      const native = await createNativeDetector();
+      if (!alive) return;
+
+      // The scan loop. Sequential awaits are the backpressure: a new decode
+      // never starts while one is in flight, so a slow phone simply scans at
+      // its own pace instead of piling up work and freezing the preview.
+      while (alive) {
+        const t0 = performance.now();
+        const code = await decodeOnce(video, native).catch(() => null);
+        if (!alive) return;
+        if (code) {
+          // The supermarket blip: the cashier knows it read without looking.
+          playScanBeep();
+          onDetectedRef.current(code);
+          onOpenChangeRef.current(false);
+          return;
+        }
+        // Native detection is nearly free — go again next frame. The wasm pass
+        // costs tens of ms on the main thread — breathe for half its cost so
+        // the preview and the UI stay fluid.
+        const pause = native ? 33 : Math.min(120, Math.max(30, (performance.now() - t0) / 2));
+        await new Promise(r => setTimeout(r, pause));
+      }
+    })();
 
     return () => {
-      isMounted = false;
-      clearTimeout(timer);
-      scannerRef.current = null;
-      // Wait for a start that may still be in flight before tearing it down.
-      startup.finally(() => {
-        if (scanner && started) {
-          scanner.stop().then(() => scanner?.clear()).catch(() => {
-            try { scanner?.clear(); } catch { /* already torn down */ }
-          });
-        }
-      });
+      alive = false;
+      trackRef.current = null;
+      const video = videoRef.current;
+      if (video) {
+        video.pause();
+        video.srcObject = null;
+      }
+      // `stream` may still be null if cleanup ran during getUserMedia — the
+      // in-flight branch above notices `alive === false` and stops the tracks.
+      stream?.getTracks().forEach(t => t.stop());
     };
   }, [open]);
 
   function toggleTorch() {
-    const s = scannerRef.current;
-    if (!s) return;
+    const track = trackRef.current;
+    if (!track) return;
     const next = !torchOn;
-    applyAdvanced(s, { torch: next })
+    applyAdvanced(track, { torch: next })
       .then(() => setTorchOn(next))
       .catch(() => null);
   }
 
   function handleZoom(value: number) {
-    const s = scannerRef.current;
-    if (!s) return;
+    const track = trackRef.current;
+    if (!track) return;
     setZoom(value);
-    applyAdvanced(s, { zoom: value }).catch(() => null);
+    applyAdvanced(track, { zoom: value }).catch(() => null);
   }
 
   return (
     <MobileOverlay open={open} onOpenChange={onOpenChange} title={title}>
       <div className="flex flex-col h-full bg-black">
         <div className="flex-1 relative overflow-hidden">
-          {/* html5-qrcode overwrites the scanner element's position with an
-              inline `relative` and sizes the video to its natural aspect, so
-              the element can't stretch itself — this wrapper centers it
-              instead. Portrait phone streams fill the screen; a landscape
-              webcam letterboxes in the middle rather than sticking to the top. */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {/* The library draws its own gray region markers for the qrbox;
-                our white frame already marks the window, so hide theirs. */}
-            <div id={SCANNER_ELEMENT_ID} ref={containerRef} className="w-full [&_#qr-shaded-region]:!hidden" />
-          </div>
+          {/* object-cover: the preview fills the screen edge-to-edge like the
+              native camera app; decoding still sees the full uncropped frame. */}
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            className="absolute inset-0 h-full w-full object-cover"
+          />
           {!error && (
             <>
-              <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-[340px] aspect-[5/3] rounded-3xl ring-2 ring-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none">
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[86vw] max-w-[350px] aspect-[5/3] rounded-3xl ring-2 ring-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)] pointer-events-none">
                 {/* A red aiming line down the middle — line it up with the barcode. */}
                 <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-0.5 bg-red-500/80 rounded-full" />
               </div>
