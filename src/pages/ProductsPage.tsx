@@ -29,6 +29,7 @@ import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { BarcodeScannerDialog, ScanButton } from '@/components/common/BarcodeScanner';
 import { MoneyInput } from '@/components/common/MoneyInput';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 import useBarcodeName from '@/hooks/use-barcode-name';
 import {
   productsApi, LOW_STOCK_THRESHOLD,
@@ -213,6 +214,9 @@ function ProductDialog({
   const purchasePrice = form.watch('purchasePrice');
   const sellPrice = form.watch('price');
   const marginPct = sellPrice > 0 ? Math.round(((sellPrice - purchasePrice) / sellPrice) * 1000) / 10 : 0;
+  // Profit is the owner's number. The cashier still types the purchase price
+  // (they receive the goods), but the margin line stays off their screen.
+  const { isSuperAdmin } = useAuth();
 
   // A scanned barcode fetches the product's name from the world databases and
   // fills the empty Nomi field — only for codes we do NOT already stock; a
@@ -319,7 +323,7 @@ function ProductDialog({
                 </FormItem>
               )} />
             </div>
-            {sellPrice > 0 && (
+            {sellPrice > 0 && isSuperAdmin && (
               <div className="flex items-center justify-between px-4 py-3 mt-4 rounded-2xl bg-success/10 text-sm">
                 <span className="text-success font-medium">Har biridan foyda</span>
                 <span className={cn('font-bold', marginPct >= 0 ? 'text-success' : 'text-destructive')}>
