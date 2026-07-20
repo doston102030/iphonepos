@@ -141,13 +141,11 @@
 
 @layer base {
   :root {
-    /* The mobile tab bar is a floating dock: a rounded glass pill of --dock-h,
-       held clear of the screen edge by --dock-gap plus the iPhone home
-       indicator. --bottom-nav-h is the total space it occupies; pages pad their
-       scroll area by it so nothing hides behind the dock. Derived, not
-       hand-tuned — change --dock-h/--dock-gap and the padding follows. */
-    --dock-h: 5.25rem;
-    --dock-gap: 0.75rem;
+    /* The mobile tab bar is a native iOS-style bar welded to the screen edge:
+       a hairline-topped glass strip of --dock-h that carries its own
+       home-indicator padding. --bottom-nav-h is the total space it occupies;
+       pages pad their scroll area by it so nothing hides behind the bar. */
+    --dock-h: 3.5rem;
     /* Device inset, however the app is hosted. A plain browser/PWA reports it
        via env(); a fullscreen Telegram Mini App reports zeros there and sets
        its own --tg-*-inset vars instead (device notch + Telegram's floating
@@ -160,7 +158,7 @@
       env(safe-area-inset-bottom, 0px),
       calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px))
     );
-    --bottom-nav-h: calc(var(--dock-h) + var(--dock-gap) + var(--inset-bottom));
+    --bottom-nav-h: calc(var(--dock-h) + var(--inset-bottom));
   }
 
   * {
@@ -242,12 +240,7 @@
     margin-bottom: var(--inset-bottom);
   }
 
-  /* Lifts the floating dock off the screen edge, above the home indicator. */
-  .nav-dock-inset {
-    padding-bottom: calc(var(--dock-gap) + var(--inset-bottom));
-  }
-
-  /* Clears the mobile tab bar (dock height + gap + home indicator). */
+  /* Clears the mobile tab bar (bar height + home indicator). */
   .pb-nav {
     padding-bottom: var(--bottom-nav-h);
   }

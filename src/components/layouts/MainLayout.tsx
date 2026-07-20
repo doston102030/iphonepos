@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ShoppingCart, CreditCard, Warehouse,
   BarChart3, MessageSquare, Settings, Users, LogOut,
-  ChevronRight, ChevronLeft, Sun, Moon, TrendingUp, Receipt, Boxes,
+  ChevronRight, ChevronLeft, Sun, Moon, TrendingUp, Receipt, Boxes, RotateCw,
 } from 'lucide-react';
 import useGoBack from '@/hooks/use-go-back';
 import useKeyboardOpen from '@/hooks/use-keyboard-open';
@@ -165,6 +165,26 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/**
+ * Hard-reloads the page. Inside the Telegram Mini App there is no browser
+ * chrome, so without this the only way to refetch after a network hiccup is
+ * killing and reopening the whole mini-app.
+ */
+function ReloadButton() {
+  const [spinning, setSpinning] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label="Yangilash"
+      title="Yangilash"
+      onClick={() => { setSpinning(true); window.location.reload(); }}
+      className="h-9 w-9 rounded-full bg-muted text-foreground flex items-center justify-center transition-colors hover:bg-muted/70 press"
+    >
+      <RotateCw className={cn('h-4 w-4', spinning && 'animate-spin')} />
+    </button>
+  );
+}
+
 function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
   cartCount: number; unpaidDebtsCount: number;
 }) {
@@ -178,17 +198,14 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
     return 0;
   };
 
-  const tabClass = 'flex-1 flex flex-col items-center justify-center gap-1.5 h-full rounded-[2rem] font-semibold tracking-tight press';
-
   return (
-    // A floating iOS-style dock rather than a bar welded to the screen edge: the
-    // page scrolls under the glass, and the rounded shell keeps clear of the
-    // home indicator. `nav-dock-inset` owns the gap so the sum still equals
-    // --bottom-nav-h, which every page pads by.
+    // A native iOS tab bar: an edge-to-edge glass strip under a hairline, the
+    // page scrolling beneath it. The bar owns its home-indicator padding (the
+    // fixed height lives on the inner row — never both on one element).
     // backdrop-saturate is what makes it read as APPLE glass, not frosted
     // plastic: colors scrolling beneath come through vivid, not washed out.
-    <nav className="absolute bottom-0 left-0 right-0 z-40 px-3 pointer-events-none nav-dock-inset">
-      <div className="pointer-events-auto flex items-stretch h-[var(--dock-h)] rounded-[2.5rem] bg-background/80 backdrop-blur-2xl backdrop-saturate-150 border border-border/70 shadow-[0_2px_6px_rgba(0,0,0,0.06),0_12px_36px_-8px_rgba(0,0,0,0.28)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.4),0_12px_36px_-8px_rgba(0,0,0,0.75)] px-2.5">
+    <nav className="absolute bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-background/80 backdrop-blur-2xl backdrop-saturate-150 pb-[var(--inset-bottom)]">
+      <div className="flex items-stretch h-[var(--dock-h)]">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = isPathActive(location.pathname, tab.path);
@@ -197,23 +214,27 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
             <Link
               key={tab.path}
               to={tab.path}
-              className={cn(tabClass, isActive ? 'text-primary' : 'text-muted-foreground')}
+              className={cn(
+                'flex-1 flex flex-col items-center justify-center gap-1 tracking-tight press',
+                isActive ? 'text-primary' : 'text-muted-foreground'
+              )}
             >
-              <span className={cn(
-                'relative flex items-center justify-center h-11 w-16 rounded-full transition-colors',
-                isActive && 'bg-primary/[0.12]'
-              )}>
+              <span className="relative flex items-center justify-center">
+                {/* Telegram's trick for "filled when active" with outline
+                    glyphs: tint the glyph's own body, don't add a pill. */}
                 <Icon
-                  className="h-7 w-7"
-                  strokeWidth={isActive ? 2.3 : 1.8}
+                  className="h-[26px] w-[26px]"
+                  strokeWidth={isActive ? 2.1 : 1.8}
+                  fill="currentColor"
+                  fillOpacity={isActive ? 0.2 : 0}
                 />
                 {badge > 0 && (
-                  <span className="absolute -top-1 right-1.5 h-[19px] min-w-[19px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center border-2 border-background shadow-sm">
+                  <span className="absolute -top-1.5 left-3.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center border border-background">
                     {badge > 99 ? '99+' : badge}
                   </span>
                 )}
               </span>
-              <span className={cn('truncate max-w-full px-0.5 leading-none text-[11px]', isActive && 'font-bold')}>
+              <span className={cn('truncate max-w-full px-0.5 leading-none text-[10px] font-medium', isActive && 'font-semibold')}>
                 {tab.label}
               </span>
             </Link>
@@ -357,12 +378,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             border-box sizing the inset padding eats the 56px box instead of
             growing it, so inside Telegram the page title slid up under the
             floating Закрыть/menu pills. */}
-        <header className="md:hidden border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30 safe-area-top">
+        <header className="md:hidden border-b border-border/60 bg-background/80 backdrop-blur-2xl backdrop-saturate-150 shrink-0 sticky top-0 z-30 safe-area-top">
           <div className="flex items-center justify-between gap-3 px-4 h-14">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Logo className="h-6" />
+              <Logo className="h-8" />
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <ReloadButton />
               {user && (
                 <button
                   type="button"
