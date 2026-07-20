@@ -18,7 +18,7 @@ import { MobileOverlay } from '@/components/common/MobileOverlay';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useCart, type CartItem } from '@/contexts/CartContext';
 import {
-  productsApi, ordersApi, fetchAllPages, newIdempotencyKey, type ProductResponse,
+  ApiError, productsApi, ordersApi, fetchAllPages, newIdempotencyKey, type ProductResponse,
 } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getProductUnit } from '@/lib/units';
@@ -408,7 +408,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
           </div>
 
           <Form {...form}>
-            <form id="checkout-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form id="checkout-form" noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <p className="font-bold text-base mb-3 px-1">To'lov usuli</p>
                 <div className="grid grid-cols-3 gap-3">
@@ -589,8 +589,15 @@ export default function SellPage() {
       }
       addItem(product);
       toast.success(`${product.name} savatchaga qo'shildi`);
-    } catch {
-      toast.error('Bu shtrix-kodli mahsulot topilmadi');
+    } catch (err) {
+      // Only a 404 means "no such product". A dead network or a 500 must say
+      // so — telling the cashier the product doesn't exist would send them
+      // retyping a code that is actually fine.
+      if (err instanceof ApiError && err.status !== 404) {
+        toast.error(err.message);
+      } else {
+        toast.error('Bu shtrix-kodli mahsulot topilmadi');
+      }
     }
   }, [addItem, quantityOf]);
 

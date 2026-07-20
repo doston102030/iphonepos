@@ -108,17 +108,19 @@ const productSchema = z.object({
   barcode: z.string().min(1, 'Shtrix-kod kiritilishi shart'),
   purchasePrice: z.coerce.number().min(0, 'Kelish narxi manfiy bo\'lmasligi kerak'),
   price: z.coerce.number().min(0, 'Sotish narxi manfiy bo\'lmasligi kerak'),
-  stockQuantity: z.coerce.number().min(0, 'Miqdor manfiy bo\'lmasligi kerak'),
+  // .int(): the server stores counts as int32 — "1.5" would be a 400, and the
+  // order path already floors quantities, so these write paths must match.
+  stockQuantity: z.coerce.number().int('Butun son kiriting').min(0, 'Miqdor manfiy bo\'lmasligi kerak'),
 });
 
 const restockSchema = z.object({
-  quantity: z.coerce.number().min(1, 'Miqdor kamida 1 bo\'lishi kerak'),
+  quantity: z.coerce.number().int('Butun son kiriting').min(1, 'Miqdor kamida 1 bo\'lishi kerak'),
 });
 
 // `note` is optional on the server too, and the three reasons already say what
 // happened — so the form does not ask for it.
 const outflowSchema = z.object({
-  quantity: z.coerce.number().min(1, 'Miqdor kamida 1 bo\'lishi kerak'),
+  quantity: z.coerce.number().int('Butun son kiriting').min(1, 'Miqdor kamida 1 bo\'lishi kerak'),
   reason: z.enum(['DAMAGED', 'LOST', 'RETURNED'], { required_error: 'Sabab tanlanishi shart' }),
 });
 
@@ -242,7 +244,11 @@ function ProductDialog({
   return (
     <MobileOverlay open={open} onOpenChange={onOpenChange} title={product ? 'Mahsulotni tahrirlash' : existing ? 'Mavjud mahsulot' : 'Yangi mahsulot'}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4 h-full flex flex-col">
+        {/* noValidate: number inputs default to step=1, and the browser's own
+            step-mismatch popup comes out in the OS language (Russian here) —
+            zod already covers every rule with Uzbek wording. Same on every
+            form in the app that holds a type="number" input. */}
+        <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4 h-full flex flex-col">
           <div className="flex-1">
             <p className="text-[11px] font-semibold text-muted-foreground tracking-wide mb-2 px-0.5">ASOSIY MA'LUMOTLAR</p>
             <div className="rounded-2xl border-0 bg-muted/30 shadow-sm overflow-hidden mb-6">
@@ -363,7 +369,7 @@ function RestockDialog({
   return (
     <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Omborni to'ldirish`}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
+        <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
           <div className="p-4 bg-muted/30 rounded-2xl mb-4 border border-border text-center">
             <p className="text-muted-foreground text-sm mb-1">Mahsulot</p>
             <h3 className="font-bold text-lg">{product?.name}</h3>
@@ -415,7 +421,7 @@ function OutflowDialog({
   return (
     <MobileOverlay open={open} onOpenChange={onOpenChange} title={`Chiqim`}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
+        <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4 h-full flex flex-col">
           <div className="p-4 bg-muted/30 rounded-2xl mb-4 border border-border text-center">
             <p className="text-muted-foreground text-sm mb-1">Mahsulot</p>
             <h3 className="font-bold text-lg">{product?.name}</h3>

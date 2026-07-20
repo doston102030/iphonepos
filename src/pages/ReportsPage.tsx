@@ -137,7 +137,12 @@ function DailyTab() {
     try {
       const res = await reportsApi.daily(date);
       setData(res);
-    } catch { toast.error('Hisobot yuklanmadi'); }
+    } catch {
+      // Cleared, not kept: a failed reload for a NEW date would otherwise leave
+      // the previous date's numbers on screen under the new date in the picker.
+      setData(null);
+      toast.error('Hisobot yuklanmadi');
+    }
     finally { setLoading(false); }
   }
 
@@ -171,7 +176,11 @@ function RangeTab() {
     try {
       const res = await reportsApi.range(from, to);
       setData(res);
-    } catch { toast.error('Hisobot yuklanmadi'); }
+    } catch {
+      // Same reasoning as DailyTab: stale numbers under fresh dates lie.
+      setData(null);
+      toast.error('Hisobot yuklanmadi');
+    }
     finally { setLoading(false); }
   }
 

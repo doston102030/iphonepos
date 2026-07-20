@@ -89,7 +89,7 @@ function DebtDialog({
   return (
     <MobileOverlay open={open} onOpenChange={onOpenChange} title={debt ? 'Qarzni tahrirlash' : 'Yangi qarz'}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-5 h-full flex flex-col">
+        <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-5 h-full flex flex-col">
           <FormField control={form.control} name="customerName" render={({ field }) => (
             <FormItem>
               <FormLabel className="font-semibold text-muted-foreground">Mijoz ismi</FormLabel>

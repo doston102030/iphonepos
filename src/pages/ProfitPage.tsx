@@ -184,7 +184,10 @@ export default function ProfitPage() {
           </Card>
         )}
 
-        <Card className="shadow-card rounded-2xl">
+        {/* Hidden entirely when the fetch failed (summary === null): showing
+            "Ma'lumot yo'q" under the red "yuklanmadi" banner would claim the
+            shop sold nothing when in truth nothing was loaded. */}
+        {(loading || summary) && <Card className="shadow-card rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Eng ko'p sotilgan mahsulotlar</CardTitle>
           </CardHeader>
@@ -230,7 +233,7 @@ export default function ProfitPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
       </div>
     </MainLayout>
   );

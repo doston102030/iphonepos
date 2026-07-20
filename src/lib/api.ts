@@ -31,6 +31,20 @@ function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
+/**
+ * Every failure request() throws, with the HTTP status attached — status 0 for
+ * "the network itself is down". Callers that must tell "the record does not
+ * exist" (404) apart from "the server is unreachable" check `status` instead
+ * of matching message strings. Mock-mode rejections stay plain Errors.
+ */
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -59,7 +73,7 @@ async function request<T>(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error("Server bilan bog'lanib bo'lmadi. Internet aloqasini tekshiring.");
+    throw new ApiError(0, "Server bilan bog'lanib bo'lmadi. Internet aloqasini tekshiring.");
   }
 
   // A 401 on the login call means "wrong PIN", not "session expired" — bouncing
@@ -70,7 +84,7 @@ async function request<T>(
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
-    throw new Error('Sessiya tugadi. Iltimos qayta kiring.');
+    throw new ApiError(401, 'Sessiya tugadi. Iltimos qayta kiring.');
   }
 
   if (response.status === 204) return undefined as T;
@@ -83,14 +97,14 @@ async function request<T>(
     // shadowed every message below: a mistyped PIN showed the cashier a raw
     // "Unauthorized" instead of "PIN noto'g'ri".
     const serverMessage = typeof data?.message === 'string' ? data.message.trim() : '';
-    if (serverMessage) throw new Error(serverMessage);
-    if (response.status === 401 && isLoginRequest) throw new Error("PIN noto'g'ri");
-    if (response.status === 429) throw new Error("Juda ko'p urinish. Bir necha daqiqa kutib, qaytadan urinib ko'ring.");
-    if (response.status === 403) throw new Error("Bu amal uchun huquqingiz yo'q.");
-    if (response.status === 404) throw new Error("Ma'lumot topilmadi.");
-    if (response.status === 501) throw new Error('Bu xizmat hali ulanmagan.');
-    if (response.status >= 500) throw new Error("Server javob bermayapti. Birozdan so'ng qaytadan urinib ko'ring.");
-    throw new Error(`Xato: ${response.status}`);
+    if (serverMessage) throw new ApiError(response.status, serverMessage);
+    if (response.status === 401 && isLoginRequest) throw new ApiError(401, "PIN noto'g'ri");
+    if (response.status === 429) throw new ApiError(429, "Juda ko'p urinish. Bir necha daqiqa kutib, qaytadan urinib ko'ring.");
+    if (response.status === 403) throw new ApiError(403, "Bu amal uchun huquqingiz yo'q.");
+    if (response.status === 404) throw new ApiError(404, "Ma'lumot topilmadi.");
+    if (response.status === 501) throw new ApiError(501, 'Bu xizmat hali ulanmagan.');
+    if (response.status >= 500) throw new ApiError(response.status, "Server javob bermayapti. Birozdan so'ng qaytadan urinib ko'ring.");
+    throw new ApiError(response.status, `Xato: ${response.status}`);
   }
 
   return data as T;
