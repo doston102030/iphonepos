@@ -39,9 +39,7 @@ import {
   cn, formatCurrency, formatDateTime,
   getOutflowReasonLabel, getStockMovementTypeLabel
 } from '@/lib/utils';
-import {
-  UNITS, UNIT_LABELS, DEFAULT_UNIT, getProductUnit, setProductUnit, type Unit,
-} from '@/lib/units';
+import { getProductUnit } from '@/lib/units';
 
 // min-w-0 lets the value shrink instead of shoving the label; pl-2 keeps a long
 // value from touching the label; text stays right-aligned like a receipt.
@@ -138,10 +136,6 @@ function ProductDialog({
   onSaved: () => void;
 }) {
   const [scannerOpen, setScannerOpen] = useState(false);
-  // The unit lives outside the zod schema on purpose: the server's
-  // ProductRequest has no such field, so it is saved device-side after the
-  // API call succeeds (see lib/units.ts).
-  const [unit, setUnit] = useState<Unit>(DEFAULT_UNIT);
   // A barcode that is already in the catalogue must not create a twin product:
   // the matching record is pulled into the form and Saqlash becomes an update.
   // The ref mirrors the state so the async lookup below can read the current
@@ -164,10 +158,8 @@ function ProductDialog({
         price: product.price,
         stockQuantity: product.stockQuantity,
       });
-      setUnit(getProductUnit(product.id));
     } else {
       form.reset({ name: '', barcode: '', purchasePrice: 0, price: 0, stockQuantity: 0 });
-      setUnit(DEFAULT_UNIT);
     }
   }, [product, open, form]);
 
@@ -186,7 +178,6 @@ function ProductDialog({
       existingRef.current = null;
       setExisting(null);
       form.reset({ name: '', barcode: code, purchasePrice: 0, price: 0, stockQuantity: 0 });
-      setUnit(DEFAULT_UNIT);
     };
 
     if (code.length < 4) {
@@ -209,7 +200,6 @@ function ProductDialog({
             price: found.price,
             stockQuantity: found.stockQuantity,
           });
-          setUnit(getProductUnit(found.id));
         })
         .catch(() => {
           if (alive) clearBorrowed();
@@ -237,11 +227,9 @@ function ProductDialog({
       const target = product ?? existing;
       if (target) {
         await productsApi.update(target.id, values);
-        setProductUnit(target.id, unit);
         notify.success('Mahsulot yangilandi');
       } else {
-        const created = await productsApi.create(values);
-        setProductUnit(created.id, unit);
+        await productsApi.create(values);
         notify.success('Mahsulot yaratildi');
       }
       onSaved();
@@ -314,7 +302,7 @@ function ProductDialog({
                 </FormItem>
               )} />
               <FormField control={form.control} name="stockQuantity" render={({ field }) => (
-                <FormItem className="space-y-0.5 px-4 py-3 border-b border-border/50">
+                <FormItem className="space-y-0.5 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <FormLabel className="shrink-0 text-sm font-medium text-muted-foreground w-28">Ombordagi</FormLabel>
                     <FormControl>
@@ -324,33 +312,10 @@ function ProductDialog({
                   <FormMessage className="text-right" />
                 </FormItem>
               )} />
-              {/* Chips instead of a dropdown: all seven units are visible at
-                  once and one tap picks — no popup list to open and close. */}
-              <div className="px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground">O'lchov birligi</span>
-                <div className="flex flex-wrap gap-1.5 mt-2.5">
-                  {UNITS.map(u => (
-                    <button
-                      key={u}
-                      type="button"
-                      aria-pressed={u === unit}
-                      onClick={() => setUnit(u)}
-                      className={cn(
-                        'h-9 px-3.5 rounded-full text-[13px] font-semibold transition-colors press',
-                        u === unit
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'bg-background text-muted-foreground border border-border/60'
-                      )}
-                    >
-                      {UNIT_LABELS[u]}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
             {sellPrice > 0 && (
               <div className="flex items-center justify-between px-4 py-3 mt-4 rounded-2xl bg-success/10 text-sm">
-                <span className="text-success font-medium">Bir {unit} foyda</span>
+                <span className="text-success font-medium">Har biridan foyda</span>
                 <span className={cn('font-bold', marginPct >= 0 ? 'text-success' : 'text-destructive')}>
                   {formatCurrency(sellPrice - purchasePrice)} ({marginPct}%)
                 </span>
