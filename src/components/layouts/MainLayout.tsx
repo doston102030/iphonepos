@@ -199,13 +199,14 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
   };
 
   return (
-    // A native iOS tab bar: an edge-to-edge glass strip under a hairline, the
-    // page scrolling beneath it. The bar owns its home-indicator padding (the
-    // fixed height lives on the inner row — never both on one element).
+    // Telegram-iOS's floating tab bar, per the user's reference shot: a
+    // compact rounded glass dock lifted off the screen edge, the page
+    // scrolling beneath it. `nav-dock-inset` owns the gap so the sum still
+    // equals --bottom-nav-h, which every page pads by.
     // backdrop-saturate is what makes it read as APPLE glass, not frosted
     // plastic: colors scrolling beneath come through vivid, not washed out.
-    <nav className="absolute bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-background/80 backdrop-blur-2xl backdrop-saturate-150 pb-[var(--inset-bottom)]">
-      <div className="flex items-stretch h-[var(--dock-h)]">
+    <nav className="absolute bottom-0 left-0 right-0 z-40 px-3 pointer-events-none nav-dock-inset">
+      <div className="pointer-events-auto flex items-stretch h-[var(--dock-h)] rounded-[1.75rem] bg-background/80 backdrop-blur-2xl backdrop-saturate-150 border border-border/60 shadow-[0_2px_6px_rgba(0,0,0,0.06),0_12px_32px_-8px_rgba(0,0,0,0.25)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.4),0_12px_32px_-8px_rgba(0,0,0,0.7)] px-1.5">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = isPathActive(location.pathname, tab.path);
@@ -226,7 +227,7 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
                   className="h-[26px] w-[26px]"
                   strokeWidth={isActive ? 2.1 : 1.8}
                   fill="currentColor"
-                  fillOpacity={isActive ? 0.2 : 0}
+                  fillOpacity={isActive ? 0.25 : 0}
                 />
                 {badge > 0 && (
                   <span className="absolute -top-1.5 left-3.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center border border-background">
