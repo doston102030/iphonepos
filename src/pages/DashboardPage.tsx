@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ShoppingCart, Package, CreditCard, TrendingUp,
+  ShoppingCart, Package, CreditCard, TrendingUp, BarChart3,
   Warehouse, Wallet, TrendingDown, Trophy, AlertTriangle, Users, CalendarDays,
 } from 'lucide-react';
+import {
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -11,13 +14,13 @@ import { Button } from '@/components/ui/button';
 import MainLayout, { PageHeader } from '@/components/layouts/MainLayout';
 import {
   reportsApi, ordersApi, inventorySummary,
-  type SalesReportResponse, type OrderResponse, type PaymentMethod,
-  type UserSalesResponse,
+  type SalesReportResponse, type DailySalesResponse, type OrderResponse,
+  type PaymentMethod, type UserSalesResponse,
   extractContent,
 } from '@/lib/api';
 import {
   cn, formatCurrency, formatDateTime, getPaymentMethodLabel, getRoleLabel,
-  todayStr, daysAgoStr, monthStartStr, uzDayLabel, uzRangeLabel,
+  todayStr, daysAgoStr, uzDayLabel, uzRangeLabel,
 } from '@/lib/utils';
 import { getProductUnit } from '@/lib/units';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,44 +53,87 @@ function KpiCard({
   );
 }
 
-/**
- * A period summary read in one glance: the takings LEAD as the hero number,
- * and profit/orders sit in two labeled, color-coded tiles beneath. The old
- * label:value rows set every number in the same small size, so nothing led
- * and the card read as bookkeeping instead of an answer.
- */
-function PeriodCard({ title, range, report, loading }: {
-  title: string; range: string; report: SalesReportResponse | null; loading: boolean;
+/** Y-axis money in a couple of glyphs: 1 500 000 → "1.5M", 40 000 → "40k". */
+function compactSum(v: number): string {
+  if (v >= 1_000_000) return `${+(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}k`;
+  return String(v);
+}
+
+interface TrendPoint { date: string; day: number; revenue: number; orders: number }
+
+function TrendTooltip({ active, payload }: {
+  active?: boolean; payload?: ReadonlyArray<{ payload: TrendPoint }>;
 }) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="rounded-xl border border-border bg-card px-3 py-2 shadow-card">
+      <p className="text-[11px] font-medium text-muted-foreground">{uzDayLabel(p.date)}</p>
+      <p className="text-sm font-bold text-foreground">{formatCurrency(p.revenue)}</p>
+      <p className="text-[11px] text-muted-foreground">{p.orders} ta buyurtma</p>
+    </div>
+  );
+}
+
+/**
+ * The week in one card: the takings LEAD as the hero number, profit/orders sit
+ * in the two labeled tiles the old period cards taught, and a 7-day revenue
+ * bar chart shows the shape of the week. One series, so the card title is the
+ * legend; today's bar is solid, past days sit back at 45%.
+ */
+function WeekAnalyticsCard({ report, allTime, days, loading }: {
+  report: SalesReportResponse | null; allTime: SalesReportResponse | null;
+  days: DailySalesResponse[] | null; loading: boolean;
+}) {
+  const today = todayStr();
   const profit = report?.totalProfit ?? 0;
   const profitUp = profit >= 0;
+  // The server omits days with no sales — chart over a full local 7-day
+  // scaffold so the week always shows seven bars in calendar order.
+  const points: TrendPoint[] = Array.from({ length: 7 }, (_, i) => {
+    const date = daysAgoStr(6 - i);
+    const d = days?.find(x => x.date === date);
+    return {
+      date,
+      day: new Date(`${date}T00:00:00`).getDate(),
+      revenue: d?.totalRevenue ?? 0,
+      orders: d?.totalOrders ?? 0,
+    };
+  });
+
   return (
     <Card className="shadow-card">
       <CardContent className="p-4 md:p-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <CalendarDays className="h-4 w-4" />
+              <BarChart3 className="h-4 w-4" />
             </div>
-            <p className="text-sm font-semibold truncate">{title}</p>
+            <p className="text-sm font-semibold truncate">Savdo analitikasi</p>
           </div>
-          <span className="text-[11px] text-muted-foreground font-semibold shrink-0">{range}</span>
+          <span className="text-[11px] text-muted-foreground font-semibold shrink-0">
+            {uzRangeLabel(daysAgoStr(6), today)}
+          </span>
         </div>
         {loading ? (
           <>
             <Skeleton className="h-8 w-36 mt-4 mb-3" />
-            <div className="grid grid-cols-2 gap-2">
-              <Skeleton className="h-[54px] rounded-xl" />
-              <Skeleton className="h-[54px] rounded-xl" />
-            </div>
+            <Skeleton className="h-40 w-full rounded-xl" />
           </>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground font-medium mt-3.5">Savdo</p>
+            <p className="text-xs text-muted-foreground font-medium mt-3.5">7 kunlik savdo</p>
             <p className="kpi-number text-foreground break-words mt-0.5">
               {report ? formatCurrency(report.totalRevenue) : '—'}
             </p>
             <div className="grid grid-cols-2 gap-2 mt-3">
+              <div className="col-span-2 rounded-xl bg-primary/10 px-3 py-2.5">
+                <p className="text-[11px] font-medium text-primary/80">Jami savdo (umumiy)</p>
+                <p className="text-sm font-bold text-primary break-words">
+                  {allTime ? formatCurrency(allTime.totalRevenue) : '—'}
+                </p>
+              </div>
               <div className={cn('rounded-xl px-3 py-2.5', profitUp ? 'bg-success/10' : 'bg-destructive/10')}>
                 <p className={cn('text-[11px] font-medium', profitUp ? 'text-success/80' : 'text-destructive/80')}>
                   Sof foyda
@@ -103,6 +149,42 @@ function PeriodCard({ title, range, report, loading }: {
                 </p>
               </div>
             </div>
+            {!days ? (
+              <p className="text-sm text-muted-foreground pt-4">Grafik yuklanmadi</p>
+            ) : (
+              <div className="mt-4 -ml-2 w-[calc(100%+0.5rem)] min-w-0 overflow-hidden">
+                <ResponsiveContainer width="100%" height={150}>
+                  <BarChart data={points} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="28%">
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="day" tickLine={false} axisLine={false}
+                      tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    />
+                    <YAxis
+                      width={36} tickLine={false} axisLine={false}
+                      tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                      tickFormatter={compactSum}
+                      allowDecimals={false}
+                      // An empty week auto-scales to 0–4 and the axis reads as
+                      // broken; pin a money-shaped scale until real sales exist.
+                      domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1_000_000)]}
+                    />
+                    <Tooltip content={<TrendTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.5)' }} />
+                    <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={26}>
+                      {points.map(p => (
+                        <Cell
+                          key={p.date}
+                          fill={p.date === today ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.45)'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            <Link to="/reports" className="inline-flex items-center min-h-11 text-xs text-primary font-medium press">
+              Batafsil hisobot →
+            </Link>
           </>
         )}
       </CardContent>
@@ -129,7 +211,8 @@ export default function DashboardPage() {
   const [day, setDay] = useState<SalesReportResponse | null>(null);
   const [staffSales, setStaffSales] = useState<UserSalesResponse[] | null>(null);
   const [week, setWeek] = useState<SalesReportResponse | null>(null);
-  const [month, setMonth] = useState<SalesReportResponse | null>(null);
+  const [allTime, setAllTime] = useState<SalesReportResponse | null>(null);
+  const [weekDays, setWeekDays] = useState<DailySalesResponse[] | null>(null);
   const [inventory, setInventory] = useState<InventoryStats | null>(null);
   const [recentOrders, setRecentOrders] = useState<OrderResponse[] | null>(null);
   const [dayLoading, setDayLoading] = useState(true);
@@ -168,18 +251,22 @@ export default function DashboardPage() {
 
   const loadRest = useCallback(async () => {
     setRestLoading(true);
-    const [w, m, inv, ord] = await Promise.allSettled([
+    const [w, all, wd, inv, ord] = await Promise.allSettled([
       reportsApi.range(daysAgoStr(6), todayStr()),
-      reportsApi.range(monthStartStr(), todayStr()),
+      // "Jami savdo" — the whole book. No dedicated endpoint, so the range one
+      // is asked from far before the shop existed up to today.
+      reportsApi.range('2020-01-01', todayStr()),
+      reportsApi.rangeDaily(daysAgoStr(6), todayStr()),
       inventorySummary(),
       ordersApi.getAll(0, 5),
     ]);
 
     setWeek(w.status === 'fulfilled' ? w.value : null);
-    setMonth(m.status === 'fulfilled' ? m.value : null);
+    setAllTime(all.status === 'fulfilled' ? all.value : null);
+    setWeekDays(wd.status === 'fulfilled' ? wd.value : null);
     setInventory(inv.status === 'fulfilled' ? inv.value : null);
     setRecentOrders(ord.status === 'fulfilled' ? extractContent(ord.value) : null);
-    setRestFailed([w, m, inv, ord].some(r => r.status === 'rejected'));
+    setRestFailed([w, all, wd, inv, ord].some(r => r.status === 'rejected'));
     setRestLoading(false);
   }, []);
 
@@ -424,19 +511,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <PeriodCard
-            title="Bu hafta"
-            range={uzRangeLabel(daysAgoStr(6), todayStr())}
-            report={week}
-            loading={restLoading}
-          />
-          <PeriodCard
-            title="Bu oy"
-            range={uzRangeLabel(monthStartStr(), todayStr())}
-            report={month}
-            loading={restLoading}
-          />
+        <div className="mb-6">
+          <WeekAnalyticsCard report={week} allTime={allTime} days={weekDays} loading={restLoading} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
