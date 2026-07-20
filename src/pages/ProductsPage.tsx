@@ -142,12 +142,20 @@ function ProductDialog({
   // ProductRequest has no such field, so it is saved device-side after the
   // API call succeeds (see lib/units.ts).
   const [unit, setUnit] = useState<Unit>(DEFAULT_UNIT);
+  // A barcode that is already in the catalogue must not create a twin product:
+  // the matching record is pulled into the form and Saqlash becomes an update.
+  // The ref mirrors the state so the async lookup below can read the current
+  // value without re-arming itself.
+  const [existing, setExisting] = useState<ProductResponse | null>(null);
+  const existingRef = useRef<ProductResponse | null>(null);
   const form = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: { name: '', barcode: '', purchasePrice: 0, price: 0, stockQuantity: 0 },
   });
 
   useEffect(() => {
+    setExisting(null);
+    existingRef.current = null;
     if (product) {
       form.reset({
         name: product.name,
@@ -163,25 +171,73 @@ function ProductDialog({
     }
   }, [product, open, form]);
 
+  // Watches the barcode while a NEW product is being added. A known code loads
+  // that product's name, prices, stock and unit right here — the shopkeeper
+  // sees what is already in the ombor and corrects it in place. When the
+  // barcode then moves on to an unknown code, the borrowed values are cleared
+  // so they cannot be saved under the wrong barcode.
+  const barcodeValue = form.watch('barcode');
+  useEffect(() => {
+    if (!open || product) return;
+    const code = (barcodeValue ?? '').trim();
+
+    const clearBorrowed = () => {
+      if (!existingRef.current) return;
+      existingRef.current = null;
+      setExisting(null);
+      form.reset({ name: '', barcode: code, purchasePrice: 0, price: 0, stockQuantity: 0 });
+      setUnit(DEFAULT_UNIT);
+    };
+
+    if (code.length < 4) {
+      clearBorrowed();
+      return;
+    }
+    let alive = true;
+    // A scan lands the whole code at once; typing arrives digit by digit —
+    // the debounce keeps a lookup from firing on every keystroke.
+    const timer = setTimeout(() => {
+      productsApi.getByBarcode(code)
+        .then(found => {
+          if (!alive) return;
+          existingRef.current = found;
+          setExisting(found);
+          form.reset({
+            name: found.name,
+            barcode: found.barcode ?? code,
+            purchasePrice: found.purchasePrice,
+            price: found.price,
+            stockQuantity: found.stockQuantity,
+          });
+          setUnit(getProductUnit(found.id));
+        })
+        .catch(() => {
+          if (alive) clearBorrowed();
+        });
+    }, 350);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [barcodeValue, open, product, form]);
+
   const purchasePrice = form.watch('purchasePrice');
   const sellPrice = form.watch('price');
   const marginPct = sellPrice > 0 ? Math.round(((sellPrice - purchasePrice) / sellPrice) * 1000) / 10 : 0;
 
   // A scanned barcode fetches the product's name from the world databases and
-  // fills the empty Nomi field — only for NEW products; an existing product's
-  // name is the shop's own wording and is left alone.
+  // fills the empty Nomi field — only for codes we do NOT already stock; a
+  // known product's name is the shop's own wording and is left alone.
   useBarcodeName(
     form.watch('barcode'),
-    open && !product,
+    open && !product && !existing,
     () => form.getValues('name') ?? '',
     name => form.setValue('name', name, { shouldValidate: true }),
   );
 
   async function onSubmit(values: ProductForm) {
     try {
-      if (product) {
-        await productsApi.update(product.id, values);
-        setProductUnit(product.id, unit);
+      const target = product ?? existing;
+      if (target) {
+        await productsApi.update(target.id, values);
+        setProductUnit(target.id, unit);
         notify.success('Mahsulot yangilandi');
       } else {
         const created = await productsApi.create(values);
@@ -196,7 +252,7 @@ function ProductDialog({
   }
 
   return (
-    <MobileOverlay open={open} onOpenChange={onOpenChange} title={product ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}>
+    <MobileOverlay open={open} onOpenChange={onOpenChange} title={product ? 'Mahsulotni tahrirlash' : existing ? 'Mavjud mahsulot' : 'Yangi mahsulot'}>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4 h-full flex flex-col">
           <div className="flex-1">
@@ -226,6 +282,12 @@ function ProductDialog({
                 </FormItem>
               )} />
             </div>
+
+            {existing && (
+              <div className="px-4 py-3 -mt-3 mb-6 rounded-2xl bg-primary/10 text-[13px] leading-snug font-medium text-primary">
+                Bu mahsulot omborda allaqachon bor — narxlari va qoldig'i yuklandi. Saqlash shu mahsulotni yangilaydi.
+              </div>
+            )}
 
             <p className="text-[11px] font-semibold text-muted-foreground tracking-wide mb-2 px-0.5">NARX VA OMBOR</p>
             <div className="rounded-2xl border-0 bg-muted/30 shadow-sm overflow-hidden">

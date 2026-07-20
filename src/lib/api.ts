@@ -211,11 +211,6 @@ export interface OutflowResponse {
   reason: OutflowReason; note?: string; createdAt: string;
 }
 
-export interface StockReceiveRequest {
-  barcode: string; name?: string;
-  purchasePrice: number; price: number; quantity: number;
-}
-
 export interface BarcodeLookupResponse {
   barcode: string; found: boolean; name?: string; brand?: string;
 }
@@ -238,8 +233,6 @@ export const productsApi = USE_MOCK ? mockProductsApi : {
     request<ProductResponse>('POST', `/api/products/${id}/restock`, body),
   createOutflow: (id: number, body: OutflowRequest) =>
     request<OutflowResponse>('POST', `/api/products/${id}/outflow`, body),
-  receive: (body: StockReceiveRequest) =>
-    request<ProductResponse>('POST', '/api/products/receive', body),
   restockHistory: (id: number) =>
     request<StockMovementResponse[]>('GET', `/api/products/${id}/restock-history`),
 };

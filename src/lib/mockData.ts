@@ -12,7 +12,7 @@ import type {
   PagedResponse, PaymentMethod,
   ProductRequest, ProductResponse, ProductSalesResponse, RestockRequest, SalesReportResponse,
   SettingsRequest, SettingsResponse, SmsBalanceResponse, SmsCampaignResponse, SmsSendRequest,
-  StockMovementResponse, StockReceiveRequest,
+  StockMovementResponse,
   UserRequest, UserUpdateRequest, UserResponse, UserSalesResponse,
 } from './api';
 
@@ -388,27 +388,6 @@ export const mockProductsApi = {
       note: body.note,
       createdAt: new Date().toISOString(),
     });
-  },
-  receive: (body: StockReceiveRequest): Promise<ProductResponse> => {
-    const existing = mockProducts.find(p => p.barcode === body.barcode);
-    if (existing) {
-      existing.stockQuantity += body.quantity;
-      existing.purchasePrice = body.purchasePrice;
-      existing.price = body.price;
-      recordMovement('IN', existing, body.quantity, 'Qabul qilindi');
-      return delay({ ...existing });
-    }
-    const product: ProductResponse = {
-      id: nextProductId++,
-      name: body.name ?? body.barcode,
-      barcode: body.barcode,
-      purchasePrice: body.purchasePrice,
-      price: body.price,
-      stockQuantity: body.quantity,
-    };
-    mockProducts.push(product);
-    recordMovement('IN', product, body.quantity, 'Qabul qilindi');
-    return delay({ ...product });
   },
   restockHistory: (id: number): Promise<StockMovementResponse[]> => {
     const history = mockMovements
