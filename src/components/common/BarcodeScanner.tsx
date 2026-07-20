@@ -9,13 +9,19 @@ import { cn } from '@/lib/utils';
 
 // The decode stack, fastest first:
 //   1. Native BarcodeDetector (Android Chrome) — hardware-accelerated, reads
-//      straight off the video element, no pixel copying at all.
+//      straight off the video element, no pixel copying at all. It gives up on
+//      small/dense codes zxing still reads, so a wasm pass backs it up on
+//      every third miss instead of trusting it alone.
 //   2. zxing-wasm (everything else, crucially iPhone) — the C++ ZXing compiled
 //      to WebAssembly. This replaced html5-qrcode's JS decoder, which was the
 //      reason iPhones "never scanned": the wasm build is an order of magnitude
 //      faster and far better at worn, blurred and small (= far away) barcodes.
-// Both paths scan the ENTIRE frame at native camera resolution, so a barcode
-// does not have to sit inside the aiming window — the frame is only a guide.
+// The wasm path reads the aimed-at CENTER STRIP first at full sensor detail
+// (a quarter of the pixels ≈ 4× faster), then falls back to the entire frame,
+// so a barcode still does not have to sit inside the aiming window.
+// Small barcodes are won with optics, not decoders: the stream asks for
+// 1440p and the camera starts at ~2× zoom where the hardware offers it —
+// both put more pixels on every bar before any decoder runs.
 
 // Ship the wasm with the app bundle instead of zxing's default CDN fetch:
 // a shop tablet with flaky internet must still scan.
@@ -99,6 +105,10 @@ export function BarcodeScannerDialog({
     if (!open) return;
     let alive = true;
     let stream: MediaStream | null = null;
+    // iOS may report capabilities twice (see enhanceTrack's retry) — the
+    // startup zoom must only be applied on the first sighting, or it would
+    // yank the view back to 2× after the user has already zoomed.
+    let zoomApplied = false;
     setError(null);
     setTorchAvailable(false);
     setTorchOn(false);
@@ -122,12 +132,24 @@ export function BarcodeScannerDialog({
       if (!alive) return false;
       setTorchAvailable(caps.torch === true);
       if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+        const sliderMax = Math.min(caps.zoom.max, caps.zoom.min * 5);
         setZoomRange({
           min: caps.zoom.min,
-          max: Math.min(caps.zoom.max, caps.zoom.min * 5),
+          max: sliderMax,
           step: caps.zoom.step || 0.1,
         });
         setZoom(caps.zoom.min);
+        // Start at ~2× (what the native camera apps do for QR): the crop
+        // happens on the sensor, so every bar of a small or distant code
+        // lands on more pixels — this is what reads the tiny barcodes that
+        // a 1× wide view never resolves. The slider can always zoom back out.
+        const startZoom = Math.min(Math.max(caps.zoom.min, 2), sliderMax);
+        if (!zoomApplied && startZoom > caps.zoom.min) {
+          zoomApplied = true;
+          applyAdvanced(track, { zoom: startZoom })
+            .then(() => { if (alive) setZoom(startZoom); })
+            .catch(() => null);
+        }
       }
       return caps.torch === true || !!caps.zoom;
     };
@@ -152,23 +174,35 @@ export function BarcodeScannerDialog({
     };
 
     // One frame, one answer. Native path feeds the video element straight to
-    // the detector; wasm path copies the frame once and hands zxing the pixels.
+    // the detector; wasm path copies pixels off the frame and hands them to
+    // zxing — center strip first (the code is aimed there and a quarter of
+    // the pixels answers ~4× sooner), whole frame only after a miss.
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const decodeOnce = async (video: HTMLVideoElement, native: BarcodeDetectorLike | null): Promise<string | null> => {
+    const wasmDecodeRegion = async (
+      video: HTMLVideoElement, sy: number, sw: number, sh: number,
+    ): Promise<string | null> => {
+      if (!ctx) return null;
+      if (canvas.width !== sw) canvas.width = sw;
+      if (canvas.height !== sh) canvas.height = sh;
+      ctx.drawImage(video, 0, sy, sw, sh, 0, 0, sw, sh);
+      const results = await readBarcodes(ctx.getImageData(0, 0, sw, sh), READER_OPTIONS).catch(() => []);
+      return results.find(r => r.isValid && r.text)?.text ?? null;
+    };
+    const decodeOnce = async (
+      video: HTMLVideoElement, native: BarcodeDetectorLike | null, wasmPass: boolean,
+    ): Promise<string | null> => {
       if (video.readyState < 2 || video.videoWidth === 0) return null;
       if (native) {
         const codes = await native.detect(video).catch(() => [] as DetectedBarcode[]);
-        return codes.find(c => c.rawValue)?.rawValue ?? null;
+        const hit = codes.find(c => c.rawValue)?.rawValue ?? null;
+        if (hit || !wasmPass) return hit;
       }
-      if (!ctx) return null;
       const w = video.videoWidth;
       const h = video.videoHeight;
-      if (canvas.width !== w) canvas.width = w;
-      if (canvas.height !== h) canvas.height = h;
-      ctx.drawImage(video, 0, 0, w, h);
-      const results = await readBarcodes(ctx.getImageData(0, 0, w, h), READER_OPTIONS).catch(() => []);
-      return results.find(r => r.isValid && r.text)?.text ?? null;
+      const stripH = Math.round(h * 0.45);
+      return await wasmDecodeRegion(video, Math.round((h - stripH) / 2), w, stripH)
+          ?? await wasmDecodeRegion(video, 0, w, h);
     };
 
     (async () => {
@@ -180,16 +214,17 @@ export function BarcodeScannerDialog({
       }
       try {
         try {
-          // Full HD, not the 640×480 the browser volunteers: pixels per bar are
-          // what let a dense EAN-13 decode from across the counter. `ideal`
-          // (never `exact`) so a webcam that can't do 1080p still opens, and
+          // 1440p, not the 640×480 the browser volunteers: pixels per bar are
+          // what let a dense or physically SMALL barcode decode at all — a
+          // phone that can't do 1440p answers with its best (usually 1080p),
+          // because `ideal` (never `exact`) is a wish, not a demand. Likewise
           // `ideal: environment` so single-camera laptops don't reject.
           stream = await navigator.mediaDevices.getUserMedia({
             audio: false,
             video: {
               facingMode: { ideal: 'environment' },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 },
+              width: { ideal: 2560 },
+              height: { ideal: 1440 },
             },
           });
         } catch {
@@ -217,9 +252,14 @@ export function BarcodeScannerDialog({
       // The scan loop. Sequential awaits are the backpressure: a new decode
       // never starts while one is in flight, so a slow phone simply scans at
       // its own pace instead of piling up work and freezing the preview.
+      let tick = 0;
       while (alive) {
         const t0 = performance.now();
-        const code = await decodeOnce(video, native).catch(() => null);
+        // Android's native detector is fast but blind to small/dense codes
+        // that zxing reads — every third miss, the wasm passes run as backup.
+        const wasmPass = !native || tick % 3 === 0;
+        tick++;
+        const code = await decodeOnce(video, native, wasmPass).catch(() => null);
         if (!alive) return;
         if (code) {
           // The supermarket blip: the cashier knows it read without looking.
@@ -231,7 +271,7 @@ export function BarcodeScannerDialog({
         // Native detection is nearly free — go again next frame. The wasm pass
         // costs tens of ms on the main thread — breathe for half its cost so
         // the preview and the UI stay fluid.
-        const pause = native ? 33 : Math.min(120, Math.max(30, (performance.now() - t0) / 2));
+        const pause = wasmPass ? Math.min(120, Math.max(30, (performance.now() - t0) / 2)) : 33;
         await new Promise(r => setTimeout(r, pause));
       }
     })();
