@@ -54,16 +54,38 @@ function stripCodes(raw: string, code?: string): string {
   return name.replace(/\b\d{8,}\b/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/** Tidy a database name for a POS card: drop stray barcodes, collapse spaces,
- * glue "120 ml" → "120ml", and cap the length keeping a trailing size token. */
+/** A standalone size token: "1ltr", "0.5l", "120ml", "1.5kg"… */
+const SIZE_TOKEN_RE = /^\d+(?:[.,]\d+)?(ml|l|ltr|g|gr|kg|mg|oz|мл|л|г|кг)$/i;
+
+/** Words a name must not END on after being shortened. */
+const CONNECTORS = new Set(['with', 'for', 'and', 'of', 'the', 'in', 'для', 'с', 'и', 'в']);
+
+/**
+ * Tidy a database name for a POS card: drop stray barcodes, glue "120 ml" →
+ * "120ml", move the size token to the tail, and keep whole words up to a card
+ * line (~26 chars) — catalogue titles arrive as marketing sentences
+ * ("1 ltr Shampoo for Men Old Spice with Pump") and a till card wants
+ * "Shampoo for Men Old Spice 1ltr", not the sentence.
+ */
 export function cleanProductName(raw: string, code?: string): string {
   let name = stripCodes(raw, code);
-  name = name.replace(/(\d+)\s+(ml|l|ltr|g|gr|kg|mg|oz|мл|л|г|кг)\b/gi, '$1$2');
-  if (name.length > 48) {
-    const size = name.match(/\S*\d\S*(ml|l|g|gr|kg|mg|oz|мл|л|г|кг)\S*/i)?.[0];
-    name = name.slice(0, 44).trimEnd();
-    if (size && !name.toLowerCase().includes(size.toLowerCase())) name += ` ${size}`;
+  // Lookahead, not \b: word boundaries are ASCII-only, so "250 мл" never glued.
+  name = name.replace(/(\d+(?:[.,]\d+)?)\s+(ml|l|ltr|g|gr|kg|mg|oz|мл|л|г|кг)(?=[\s.,;)]|$)/gi, '$1$2');
+
+  const words = name.split(' ').filter(Boolean);
+  const sizeIdx = words.findIndex(w => SIZE_TOKEN_RE.test(w));
+  const size = sizeIdx >= 0 ? words.splice(sizeIdx, 1)[0] : '';
+
+  // Whole words only — the old fixed slice cut mid-word ("Old Spic").
+  const kept: string[] = [];
+  for (const w of words) {
+    if (kept.join(' ').length + (kept.length ? 1 : 0) + w.length > 26) break;
+    kept.push(w);
   }
+  while (kept.length > 1 && CONNECTORS.has(kept[kept.length - 1].toLowerCase())) kept.pop();
+  if (kept.length === 0 && words.length > 0) kept.push(words[0].slice(0, 26));
+
+  name = size ? [...kept, size].join(' ') : kept.join(' ');
   // OpenFoodFacts often ships all-lowercase names ("coca-cola 33 cl").
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
