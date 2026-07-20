@@ -61,6 +61,47 @@ function daysBeforeStr(dateStr: string, n: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/**
+ * A rounded date chip with the system calendar behind it. A bare invisible
+ * <input type="date"> stretched over the pill is not enough everywhere:
+ * Telegram Desktop's webview swallows taps on it without opening a picker
+ * (seen in production), so the tap also asks for the picker explicitly —
+ * showPicker() where it exists (Chromium), focus() where it doesn't (WebKit).
+ */
+function DatePickerChip({ value, onChange, ariaLabel, className, children }: {
+  value: string; onChange: (date: string) => void; ariaLabel: string;
+  className?: string; children: React.ReactNode;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const openPicker = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    if (typeof el.showPicker === 'function') {
+      try { el.showPicker(); } catch { /* already open */ }
+    } else {
+      el.focus();
+    }
+  };
+  return (
+    <span
+      className={cn('relative inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary press', className)}
+      onClick={openPicker}
+    >
+      <CalendarDays className="h-3.5 w-3.5" />
+      {children}
+      <input
+        ref={inputRef}
+        type="date"
+        aria-label={ariaLabel}
+        value={value}
+        max={todayStr()}
+        onChange={e => e.target.value && onChange(e.target.value)}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </span>
+  );
+}
+
 /** Y-axis money in a couple of glyphs: 1 500 000 → "1.5M", 40 000 → "40k". */
 function compactSum(v: number): string {
   if (v >= 1_000_000) return `${+(v / 1_000_000).toFixed(1)}M`;
@@ -132,21 +173,16 @@ function WeekAnalyticsCard({ anchor, onAnchorChange, report, allTime, days, load
                 Bugun
               </button>
             )}
-            {/* The header chip's trick: an invisible native date input stretched
-                over the pill opens the system calendar — the picked day becomes
-                the week's last day, so any past week is one tap away. */}
-            <span className="relative inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary press">
-              <CalendarDays className="h-3.5 w-3.5" />
+            {/* The picked day becomes the week's last day, so any past week
+                is one tap away. */}
+            <DatePickerChip
+              value={anchor}
+              onChange={onAnchorChange}
+              ariaLabel="Haftani tanlash"
+              className="text-[11px]"
+            >
               {uzRangeLabel(from, anchor)}
-              <input
-                type="date"
-                aria-label="Haftani tanlash"
-                value={anchor}
-                max={today}
-                onChange={e => e.target.value && onAnchorChange(e.target.value)}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-            </span>
+            </DatePickerChip>
           </div>
         </div>
         {loading ? (
@@ -357,20 +393,14 @@ export default function DashboardPage() {
           description={
             <>
               {isToday ? "Bugungi savdo ko'rsatkichlari" : "Savdo ko'rsatkichlari"}{' '}
-              {/* The invisible native date input stretched over the chip is what
-                  opens the system calendar — works without showPicker() support. */}
-              <span className="relative inline-flex items-center gap-1 align-middle rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                <CalendarDays className="h-3.5 w-3.5" />
+              <DatePickerChip
+                value={date}
+                onChange={setDate}
+                ariaLabel="Kunni tanlash"
+                className="align-middle text-xs"
+              >
                 {uzDayLabel(date)}
-                <input
-                  type="date"
-                  aria-label="Kunni tanlash"
-                  value={date}
-                  max={todayStr()}
-                  onChange={e => e.target.value && setDate(e.target.value)}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                />
-              </span>
+              </DatePickerChip>
               {!isToday && (
                 <button
                   type="button"
