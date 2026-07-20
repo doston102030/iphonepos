@@ -152,7 +152,7 @@
        indicator. --bottom-nav-h is the total space it occupies; pages pad their
        scroll area by it so nothing hides behind the dock. Derived, not
        hand-tuned — change --dock-h/--dock-gap and the padding follows. */
-    --dock-h: 4.5rem;
+    --dock-h: 5.25rem;
     --dock-gap: 0.75rem;
     /* Device inset, however the app is hosted. A plain browser/PWA reports it
        via env(); a fullscreen Telegram Mini App reports zeros there and sets

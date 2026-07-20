@@ -178,15 +178,17 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
     return 0;
   };
 
-  const tabClass = 'flex-1 flex flex-col items-center justify-center gap-1 h-full rounded-full text-xs font-semibold tracking-tight press';
+  const tabClass = 'flex-1 flex flex-col items-center justify-center gap-1.5 h-full rounded-[2rem] font-semibold tracking-tight press';
 
   return (
     // A floating iOS-style dock rather than a bar welded to the screen edge: the
     // page scrolls under the glass, and the rounded shell keeps clear of the
     // home indicator. `nav-dock-inset` owns the gap so the sum still equals
     // --bottom-nav-h, which every page pads by.
+    // backdrop-saturate is what makes it read as APPLE glass, not frosted
+    // plastic: colors scrolling beneath come through vivid, not washed out.
     <nav className="absolute bottom-0 left-0 right-0 z-40 px-3 pointer-events-none nav-dock-inset">
-      <div className="pointer-events-auto flex items-stretch h-[var(--dock-h)] rounded-full bg-background/70 backdrop-blur-2xl border border-border shadow-[0_8px_28px_-6px_rgba(0,0,0,0.22)] dark:shadow-[0_8px_28px_-6px_rgba(0,0,0,0.6)] px-2">
+      <div className="pointer-events-auto flex items-stretch h-[var(--dock-h)] rounded-[2.5rem] bg-background/80 backdrop-blur-2xl backdrop-saturate-150 border border-border/70 shadow-[0_2px_6px_rgba(0,0,0,0.06),0_12px_36px_-8px_rgba(0,0,0,0.28)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.4),0_12px_36px_-8px_rgba(0,0,0,0.75)] px-2.5">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = isPathActive(location.pathname, tab.path);
@@ -198,20 +200,22 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
               className={cn(tabClass, isActive ? 'text-primary' : 'text-muted-foreground')}
             >
               <span className={cn(
-                'relative flex items-center justify-center h-9 w-14 rounded-full transition-all duration-200',
-                isActive && 'bg-primary/10'
+                'relative flex items-center justify-center h-11 w-16 rounded-full transition-all duration-200',
+                isActive && 'bg-primary/[0.12] shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.15)]'
               )}>
                 <Icon
-                  className={cn('h-[26px] w-[26px] transition-transform duration-200', isActive && 'scale-105')}
-                  strokeWidth={isActive ? 2.3 : 1.9}
+                  className={cn('h-7 w-7 transition-transform duration-200', isActive && 'scale-105')}
+                  strokeWidth={isActive ? 2.3 : 1.8}
                 />
                 {badge > 0 && (
-                  <span className="absolute -top-1.5 right-1 h-[18px] min-w-[18px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center border-2 border-background">
+                  <span className="absolute -top-1 right-1.5 h-[19px] min-w-[19px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center border-2 border-background shadow-sm">
                     {badge > 99 ? '99+' : badge}
                   </span>
                 )}
               </span>
-              <span className="truncate max-w-full px-0.5 leading-none">{tab.label}</span>
+              <span className={cn('truncate max-w-full px-0.5 leading-none text-[11px]', isActive && 'font-bold')}>
+                {tab.label}
+              </span>
             </Link>
           );
         })}
