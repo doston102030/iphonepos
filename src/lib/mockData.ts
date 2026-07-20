@@ -407,9 +407,16 @@ export const mockOrdersApi = {
     return delay({ ...found.order });
   },
   create: (body: OrderRequest): Promise<OrderResponse> => {
-    const unavailable = body.items.find(it => {
-      const product = mockProducts.find(p => p.id === it.productId);
-      return !product || it.quantity <= 0 || it.quantity > product.stockQuantity;
+    // Summed per product, not only checked per line: two lines of the same
+    // product each within stock could together overdraw it below zero.
+    if (body.items.some(it => it.quantity <= 0)) {
+      return Promise.reject(new Error('Ombordagi qoldiq yetarli emas'));
+    }
+    const wanted = new Map<number, number>();
+    for (const it of body.items) wanted.set(it.productId, (wanted.get(it.productId) ?? 0) + it.quantity);
+    const unavailable = [...wanted].find(([productId, qty]) => {
+      const product = mockProducts.find(p => p.id === productId);
+      return !product || qty > product.stockQuantity;
     });
     if (unavailable) return Promise.reject(new Error('Ombordagi qoldiq yetarli emas'));
 

@@ -27,13 +27,29 @@ function storageKeyFor(userId: number | null): string | null {
   return userId === null ? null : `${STORAGE_KEY}:${userId}`;
 }
 
+/** localStorage is a text file the user can edit — one hand-broken cart row
+ * used to throw inside the totals useMemo and white-screen the whole app on
+ * boot. Rows are validated one by one; the broken ones are simply dropped. */
+function isCartItem(c: unknown): c is CartItem {
+  if (typeof c !== 'object' || c === null) return false;
+  const item = c as { product?: unknown; quantity?: unknown };
+  if (typeof item.product !== 'object' || item.product === null) return false;
+  const p = item.product as Record<string, unknown>;
+  return typeof p.id === 'number'
+    && typeof p.name === 'string'
+    && typeof p.price === 'number' && Number.isFinite(p.price)
+    && typeof p.stockQuantity === 'number'
+    && typeof item.quantity === 'number'
+    && Number.isFinite(item.quantity) && item.quantity >= 1;
+}
+
 function readCart(userId: number | null): CartItem[] {
   const key = storageKeyFor(userId);
   if (!key) return [];
   try {
     const raw = localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : null;
-    return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+    return Array.isArray(parsed) ? parsed.filter(isCartItem) : [];
   } catch {
     return [];
   }

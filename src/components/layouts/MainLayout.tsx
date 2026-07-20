@@ -229,8 +229,8 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  // A cashier's four pages are all bottom tabs, so this sheet holds nothing for
-  // them but their profile, the theme and the way out.
+  // Almost all of a cashier's pages are bottom tabs — this sheet holds only
+  // Buyurtmalar, their profile, the theme and the way out for them.
   const visibleMoreItems = visibleTo(moreItems, user?.role);
 
   function handleLogout() { logout(); onClose(); navigate('/login'); }

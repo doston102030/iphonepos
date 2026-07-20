@@ -82,8 +82,14 @@ export function cleanProductName(raw: string, code?: string): string {
     if (kept.join(' ').length + (kept.length ? 1 : 0) + w.length > 26) break;
     kept.push(w);
   }
-  while (kept.length > 1 && CONNECTORS.has(kept[kept.length - 1].toLowerCase())) kept.pop();
-  if (kept.length === 0 && words.length > 0) kept.push(words[0].slice(0, 26));
+  // > 0, not > 1: a name reduced to a single connector ("with") is junk too.
+  while (kept.length > 0 && CONNECTORS.has(kept[kept.length - 1].toLowerCase())) kept.pop();
+  if (kept.length === 0) {
+    // Nothing survived — either one giant word (kept whole, clipped) or only
+    // connectors (skipped; an empty name is better than "With").
+    const first = words.find(w => !CONNECTORS.has(w.toLowerCase()));
+    if (first) kept.push(first.slice(0, 26));
+  }
 
   name = size ? [...kept, size].join(' ') : kept.join(' ');
   // OpenFoodFacts often ships all-lowercase names ("coca-cola 33 cl").
