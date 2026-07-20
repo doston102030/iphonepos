@@ -27,6 +27,12 @@ interface TelegramWebApp {
   setBackgroundColor?: (color: string) => void;
   /** Bot API 7.10+ */
   setBottomBarColor?: (color: string) => void;
+  /** Bot API 6.1+ */
+  HapticFeedback?: {
+    impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
+    notificationOccurred: (type: 'error' | 'success' | 'warning') => void;
+    selectionChanged: () => void;
+  };
 }
 
 declare global {

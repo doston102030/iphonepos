@@ -3,11 +3,13 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { AppWrapper } from "./components/common/PageMeta.tsx";
 import { initTelegram } from "./lib/telegram";
+import { installHaptics } from "./lib/haptics";
 import "./index.css";
 
 // Before render: inside Telegram the webview opens half-height and closes on a
 // vertical swipe — both must be fixed before the first paint, not after.
 initTelegram();
+installHaptics();
 
 Sentry.init({
   dsn: import.meta.env['VITE_SENTRY_DSN'] as string | undefined,
