@@ -178,9 +178,9 @@ function ReloadButton() {
       aria-label="Yangilash"
       title="Yangilash"
       onClick={() => { setSpinning(true); window.location.reload(); }}
-      className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center transition-colors hover:bg-primary/20 press"
+      className="h-9 w-9 rounded-full bg-muted text-foreground flex items-center justify-center transition-colors hover:bg-muted/70 press"
     >
-      <RotateCw className={cn('h-4 w-4', spinning && 'animate-spin')} strokeWidth={2.4} />
+      <RotateCw className={cn('h-4 w-4', spinning && 'animate-spin')} strokeWidth={2.2} />
     </button>
   );
 }
@@ -384,7 +384,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Logo className="h-8" />
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
               <ReloadButton />
               {user && (
                 <button

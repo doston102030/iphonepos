@@ -162,6 +162,13 @@
     --bottom-nav-h: calc(var(--dock-h) + var(--dock-gap) + var(--inset-bottom));
   }
 
+  /* The webview canvas beyond the app (overscroll bounce, mid-animation
+     frames in Telegram's sheet) must wear the app's background — without
+     this it flashes the host's own color, black bands on a light app. */
+  html {
+    background-color: hsl(var(--background));
+  }
+
   * {
     @apply border-border;
     scrollbar-width: thin;

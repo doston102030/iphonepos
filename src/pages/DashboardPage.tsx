@@ -344,12 +344,13 @@ export default function DashboardPage() {
   const loadRest = useCallback(async () => {
     setRestLoading(true);
     // "Jami savdo" — the whole book. The server publishes no all-time endpoint
-    // and has been seen refusing a range that reaches years before its data
-    // (the deployed tile sat on "—"), so narrower spans are tried before
-    // giving up.
+    // and refuses (or times out on) ranges reaching far before its data — the
+    // deployed tile sat on "—" even with a 2025 start. Walk the spans down
+    // until one answers; the shop opened in 2026, so even the narrowest one
+    // still covers its whole history.
     const allTimeReport = async () => {
       let lastErr: unknown;
-      for (const from of ['2020-01-01', '2025-01-01']) {
+      for (const from of ['2020-01-01', '2025-01-01', '2026-01-01', '2026-06-01']) {
         try { return await reportsApi.range(from, todayStr()); }
         catch (e) { lastErr = e; }
       }
