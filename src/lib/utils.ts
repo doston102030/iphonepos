@@ -52,6 +52,18 @@ export function uzDayLabel(dateStr: string): string {
   return `${UZ_WEEKDAYS[d.getDay()]}, ${d.getDate()}-${UZ_MONTHS[d.getMonth()]}`;
 }
 
+/** A compact date range: "14–20-iyul", or "28-iyun – 4-iyul" across months. */
+export function uzRangeLabel(fromStr: string, toStr: string): string {
+  const a = new Date(`${fromStr}T00:00:00`);
+  const b = new Date(`${toStr}T00:00:00`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return `${fromStr} – ${toStr}`;
+  if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()) {
+    if (a.getDate() === b.getDate()) return `${a.getDate()}-${UZ_MONTHS[a.getMonth()]}`;
+    return `${a.getDate()}–${b.getDate()}-${UZ_MONTHS[a.getMonth()]}`;
+  }
+  return `${a.getDate()}-${UZ_MONTHS[a.getMonth()]} – ${b.getDate()}-${UZ_MONTHS[b.getMonth()]}`;
+}
+
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '—';
   try {

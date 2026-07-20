@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { BarChart3, Download, Calendar, TrendingUp } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import {
+  BarChart3, Download, Calendar, TrendingUp,
+  ShoppingCart, Wallet, CreditCard, Package, Percent,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,21 +49,38 @@ function SummaryCard({ data, loading }: { data: SalesReportResponse | null; load
   }
   if (!data) return null;
 
-  const items = [
-    { label: 'Jami buyurtmalar', value: String(data.totalOrders) },
-    { label: 'Jami daromad', value: formatCurrency(data.totalRevenue) },
-    { label: 'Sof foyda', value: formatCurrency(data.totalProfit) },
-    { label: 'Qarzga sotuv', value: formatCurrency(data.creditSalesAmount) },
-    { label: 'Tannarx', value: formatCurrency(totalCost(data)) },
-    { label: 'Marja', value: `${marginPct(data)}%` },
+  // Each figure wears its meaning: an icon chip names it at a glance and
+  // profit/margin flip red the moment they go negative — the old six identical
+  // gray tiles made the shopkeeper read every label to find the one number
+  // they came for.
+  const profitTone = data.totalProfit >= 0 ? 'success' : 'destructive';
+  const items: { label: string; value: string; icon: ReactNode; tone: string }[] = [
+    { label: 'Jami daromad', value: formatCurrency(data.totalRevenue), icon: <Wallet className="h-4 w-4" />, tone: 'brand' },
+    { label: 'Sof foyda', value: formatCurrency(data.totalProfit), icon: <TrendingUp className="h-4 w-4" />, tone: profitTone },
+    { label: 'Jami buyurtmalar', value: `${data.totalOrders} ta`, icon: <ShoppingCart className="h-4 w-4" />, tone: 'primary' },
+    { label: 'Qarzga sotuv', value: formatCurrency(data.creditSalesAmount), icon: <CreditCard className="h-4 w-4" />, tone: data.creditSalesAmount > 0 ? 'destructive' : 'primary' },
+    { label: 'Tannarx', value: formatCurrency(totalCost(data)), icon: <Package className="h-4 w-4" />, tone: 'muted' },
+    { label: 'Marja', value: `${marginPct(data)}%`, icon: <Percent className="h-4 w-4" />, tone: profitTone },
   ];
+  const chipTone: Record<string, string> = {
+    brand: 'bg-brand/10 text-brand',
+    success: 'bg-success/10 text-success',
+    destructive: 'bg-destructive/10 text-destructive',
+    primary: 'bg-primary/10 text-primary',
+    muted: 'bg-muted text-muted-foreground',
+  };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
       {items.map(item => (
         <Card key={item.label} className="shadow-card">
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <p className="text-xs text-muted-foreground font-medium leading-tight">{item.label}</p>
+              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${chipTone[item.tone]}`}>
+                {item.icon}
+              </div>
+            </div>
             {/* uz-UZ groups thousands with a non-breaking space, so "150 000 000
                 so'm" is one unbreakable token — without this it ran past the
                 card's edge into the next one on a phone. */}

@@ -17,7 +17,7 @@ import {
 } from '@/lib/api';
 import {
   cn, formatCurrency, formatDateTime, getPaymentMethodLabel, getRoleLabel,
-  todayStr, daysAgoStr, monthStartStr, uzDayLabel,
+  todayStr, daysAgoStr, monthStartStr, uzDayLabel, uzRangeLabel,
 } from '@/lib/utils';
 import { getProductUnit } from '@/lib/units';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,18 +51,62 @@ function KpiCard({
 }
 
 /**
- * One stat per line, label left and number right — the old three-column grid
- * squeezed "6 160 552 so'm" into a third of a phone card and the digits
- * wrapped mid-number, unreadable at a glance.
+ * A period summary read in one glance: the takings LEAD as the hero number,
+ * and profit/orders sit in two labeled, color-coded tiles beneath. The old
+ * label:value rows set every number in the same small size, so nothing led
+ * and the card read as bookkeeping instead of an answer.
  */
-function StatRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function PeriodCard({ title, range, report, loading }: {
+  title: string; range: string; report: SalesReportResponse | null; loading: boolean;
+}) {
+  const profit = report?.totalProfit ?? 0;
+  const profitUp = profit >= 0;
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-[13px] text-muted-foreground">{label}</span>
-      <span className={cn('text-sm font-bold text-foreground tabular-nums text-right', strong && 'text-base')}>
-        {value}
-      </span>
-    </div>
+    <Card className="shadow-card">
+      <CardContent className="p-4 md:p-5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <CalendarDays className="h-4 w-4" />
+            </div>
+            <p className="text-sm font-semibold truncate">{title}</p>
+          </div>
+          <span className="text-[11px] text-muted-foreground font-semibold shrink-0">{range}</span>
+        </div>
+        {loading ? (
+          <>
+            <Skeleton className="h-8 w-36 mt-4 mb-3" />
+            <div className="grid grid-cols-2 gap-2">
+              <Skeleton className="h-[54px] rounded-xl" />
+              <Skeleton className="h-[54px] rounded-xl" />
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground font-medium mt-3.5">Savdo</p>
+            <p className="kpi-number text-foreground break-words mt-0.5">
+              {report ? formatCurrency(report.totalRevenue) : '—'}
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <div className={cn('rounded-xl px-3 py-2.5', profitUp ? 'bg-success/10' : 'bg-destructive/10')}>
+                <p className={cn('text-[11px] font-medium', profitUp ? 'text-success/80' : 'text-destructive/80')}>
+                  Sof foyda
+                </p>
+                <p className={cn('text-sm font-bold break-words', profitUp ? 'text-success' : 'text-destructive')}>
+                  {report ? formatCurrency(profit) : '—'}
+                </p>
+              </div>
+              <div className="rounded-xl bg-muted/60 px-3 py-2.5">
+                <p className="text-[11px] font-medium text-muted-foreground">Buyurtmalar</p>
+                <p className="text-sm font-bold text-foreground">
+                  {report ? `${report.totalOrders} ta` : '—'}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -284,21 +328,36 @@ export default function DashboardPage() {
                 <Warehouse className="h-4 w-4 text-primary" /> Ombor holati
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent>
               {restLoading ? <Skeleton className="h-16 w-full" /> : (
                 <>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Mahsulotlar</span>
-                    <span className="font-semibold">{inventory ? `${inventory.totalProducts} ta` : '—'}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
+                  {/* Same labeled tiles as the week/month cards, so the whole
+                      dashboard speaks one visual language. */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-xl bg-muted/60 px-3 py-2.5">
+                      <p className="text-[11px] font-medium text-muted-foreground">Mahsulotlar</p>
+                      <p className="text-sm font-bold text-foreground">{inventory ? `${inventory.totalProducts} ta` : '—'}</p>
+                    </div>
                     {/* The server's low-stock cutoff counts sold-out products too,
                         so this is "kam qolgan yoki tugagan" — the Ombor page,
                         which separates the two, is one tap away. */}
-                    <span className="text-muted-foreground">Kam qolgan / tugagan</span>
-                    <span className={cn('font-semibold', (inventory?.lowStockCount ?? 0) > 0 && 'text-destructive')}>
-                      {inventory ? inventory.lowStockCount : '—'}
-                    </span>
+                    <div className={cn(
+                      'rounded-xl px-3 py-2.5',
+                      (inventory?.lowStockCount ?? 0) > 0 ? 'bg-destructive/10' : 'bg-muted/60',
+                    )}>
+                      <p className={cn(
+                        'text-[11px] font-medium',
+                        (inventory?.lowStockCount ?? 0) > 0 ? 'text-destructive/80' : 'text-muted-foreground',
+                      )}>
+                        Kam / tugagan
+                      </p>
+                      <p className={cn(
+                        'text-sm font-bold text-foreground',
+                        (inventory?.lowStockCount ?? 0) > 0 && 'text-destructive',
+                      )}>
+                        {inventory ? `${inventory.lowStockCount} ta` : '—'}
+                      </p>
+                    </div>
                   </div>
                   <Link to="/stock" className="inline-flex items-center min-h-11 text-xs text-primary font-medium press">
                     Omborni ko'rish →
@@ -366,30 +425,18 @@ export default function DashboardPage() {
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <Card className="shadow-card">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Bu hafta</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {restLoading ? <Skeleton className="h-16 w-full" /> : (
-                <>
-                  <StatRow label="Savdo" value={week ? formatCurrency(week.totalRevenue) : '—'} strong />
-                  <StatRow label="Sof foyda" value={week ? formatCurrency(week.totalProfit) : '—'} />
-                  <StatRow label="Buyurtmalar" value={week ? `${week.totalOrders} ta` : '—'} />
-                </>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="shadow-card">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Bu oy</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {restLoading ? <Skeleton className="h-16 w-full" /> : (
-                <>
-                  <StatRow label="Savdo" value={month ? formatCurrency(month.totalRevenue) : '—'} strong />
-                  <StatRow label="Sof foyda" value={month ? formatCurrency(month.totalProfit) : '—'} />
-                  <StatRow label="Buyurtmalar" value={month ? `${month.totalOrders} ta` : '—'} />
-                </>
-              )}
-            </CardContent>
-          </Card>
+          <PeriodCard
+            title="Bu hafta"
+            range={uzRangeLabel(daysAgoStr(6), todayStr())}
+            report={week}
+            loading={restLoading}
+          />
+          <PeriodCard
+            title="Bu oy"
+            range={uzRangeLabel(monthStartStr(), todayStr())}
+            report={month}
+            loading={restLoading}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
