@@ -37,18 +37,28 @@ function fetchJson<T>(url: string): Promise<T | null> {
 }
 
 /** "1 dona"-style names don't help a cashier; size or ≥2 real words do. */
-const SIZE_RE = /\d+\s*(ml|l|litr|g|gr|kg|mg|oz|dona|sht|шт|мл|л|г|кг)\b/i;
+const SIZE_RE = /\d+\s*(ml|l|ltr|litr|g|gr|kg|mg|oz|dona|sht|шт|мл|л|г|кг)\b/i;
 
 function isThinName(name: string): boolean {
   const words = name.trim().split(/\s+/);
   return words.length <= 2 && !SIZE_RE.test(name);
 }
 
-/** Tidy a database name for a POS card: collapse spaces, glue "120 ml" →
- * "120ml", and cap the length while keeping a trailing size token visible. */
-export function cleanProductName(raw: string): string {
-  let name = raw.replace(/\s+/g, ' ').trim();
-  name = name.replace(/(\d+)\s+(ml|l|g|gr|kg|mg|oz|мл|л|г|кг)\b/gi, '$1$2');
+/** UPCitemdb sometimes writes the EAN into the title itself
+ * ("7590002031636 1 ltr Shampoo…"). The code already lives in its own field,
+ * so the scanned code — and any standalone 8+ digit run, which can only be a
+ * barcode, never a size — is noise, not name. */
+function stripCodes(raw: string, code?: string): string {
+  let name = raw;
+  if (code) name = name.split(code).join(' ');
+  return name.replace(/\b\d{8,}\b/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Tidy a database name for a POS card: drop stray barcodes, collapse spaces,
+ * glue "120 ml" → "120ml", and cap the length keeping a trailing size token. */
+export function cleanProductName(raw: string, code?: string): string {
+  let name = stripCodes(raw, code);
+  name = name.replace(/(\d+)\s+(ml|l|ltr|g|gr|kg|mg|oz|мл|л|г|кг)\b/gi, '$1$2');
   if (name.length > 48) {
     const size = name.match(/\S*\d\S*(ml|l|g|gr|kg|mg|oz|мл|л|г|кг)\S*/i)?.[0];
     name = name.slice(0, 44).trimEnd();
@@ -76,7 +86,9 @@ async function fromOff(host: string, code: string): Promise<string | null> {
 
 async function fromUpc(code: string): Promise<string | null> {
   const data = await fetchJson<UpcResponse>(`/ext/upc/lookup?upc=${encodeURIComponent(code)}`);
-  return data?.items?.[0]?.title?.trim() || null;
+  // Stripped HERE, not only in cleanProductName: the thin-name race must judge
+  // the real words — "7590002031636 Shampoo" is a thin name, not a full one.
+  return stripCodes(data?.items?.[0]?.title ?? '', code) || null;
 }
 
 export async function lookupBarcodeName(code: string): Promise<string | null> {
@@ -98,7 +110,7 @@ export async function lookupBarcodeName(code: string): Promise<string | null> {
   });
 
   const full = await firstFull;
-  if (full) return cleanProductName(full);
+  if (full) return cleanProductName(full, code) || null;
   const names = (await Promise.all(attempts)).filter((n): n is string => !!n);
-  return names.length ? cleanProductName(names[0]) : null;
+  return names.length ? cleanProductName(names[0], code) || null : null;
 }
