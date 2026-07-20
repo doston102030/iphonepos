@@ -388,9 +388,9 @@ export function ScanButton({
       onClick={onClick}
       title="Skanerlash"
       aria-label="Skanerlash"
-      className={cn('h-11 w-11 rounded-xl shadow-sm border-border bg-card', className)}
+      className={cn('h-12 w-12 rounded-2xl shadow-sm border-border bg-card [&_svg]:size-6', className)}
     >
-      <Camera className="h-5 w-5 text-primary" />
+      <Camera className="text-primary" />
     </Button>
   );
 }

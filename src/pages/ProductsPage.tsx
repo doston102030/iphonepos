@@ -274,7 +274,7 @@ function ProductDialog({
                     <FormControl>
                       <Input placeholder="1234567890123" autoComplete="off" className={ROW_INPUT_CLASS} {...field} />
                     </FormControl>
-                    <ScanButton onClick={() => setScannerOpen(true)} className="shrink-0 h-9 w-9 bg-background shadow-sm" />
+                    <ScanButton onClick={() => setScannerOpen(true)} className="shrink-0 h-9 w-9 rounded-xl bg-background shadow-sm [&_svg]:size-5" />
                   </div>
                   <FormMessage className="text-right" />
                 </FormItem>
