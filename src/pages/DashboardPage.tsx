@@ -20,7 +20,7 @@ import {
 } from '@/lib/api';
 import {
   cn, formatCurrency, formatDateTime, getPaymentMethodLabel, getRoleLabel,
-  todayStr, daysAgoStr, uzDayLabel, uzRangeLabel,
+  todayStr, uzDayLabel, uzRangeLabel,
 } from '@/lib/utils';
 import { getProductUnit } from '@/lib/units';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,6 +53,14 @@ function KpiCard({
   );
 }
 
+/** The date n days before a YYYY-MM-DD date, in the shop's local calendar. */
+function daysBeforeStr(dateStr: string, n: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() - n);
+  const pad = (x: number) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** Y-axis money in a couple of glyphs: 1 500 000 → "1.5M", 40 000 → "40k". */
 function compactSum(v: number): string {
   if (v >= 1_000_000) return `${+(v / 1_000_000).toFixed(1)}M`;
@@ -82,17 +90,19 @@ function TrendTooltip({ active, payload }: {
  * bar chart shows the shape of the week. One series, so the card title is the
  * legend; today's bar is solid, past days sit back at 45%.
  */
-function WeekAnalyticsCard({ report, allTime, days, loading }: {
+function WeekAnalyticsCard({ anchor, onAnchorChange, report, allTime, days, loading }: {
+  anchor: string; onAnchorChange: (date: string) => void;
   report: SalesReportResponse | null; allTime: SalesReportResponse | null;
   days: DailySalesResponse[] | null; loading: boolean;
 }) {
   const today = todayStr();
+  const from = daysBeforeStr(anchor, 6);
   const profit = report?.totalProfit ?? 0;
   const profitUp = profit >= 0;
   // The server omits days with no sales — chart over a full local 7-day
   // scaffold so the week always shows seven bars in calendar order.
   const points: TrendPoint[] = Array.from({ length: 7 }, (_, i) => {
-    const date = daysAgoStr(6 - i);
+    const date = daysBeforeStr(anchor, 6 - i);
     const d = days?.find(x => x.date === date);
     return {
       date,
@@ -112,9 +122,32 @@ function WeekAnalyticsCard({ report, allTime, days, loading }: {
             </div>
             <p className="text-sm font-semibold truncate">Savdo analitikasi</p>
           </div>
-          <span className="text-[11px] text-muted-foreground font-semibold shrink-0">
-            {uzRangeLabel(daysAgoStr(6), today)}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            {anchor !== today && (
+              <button
+                type="button"
+                onClick={() => onAnchorChange(today)}
+                className="text-[11px] font-semibold text-primary underline underline-offset-2 press"
+              >
+                Bugun
+              </button>
+            )}
+            {/* The header chip's trick: an invisible native date input stretched
+                over the pill opens the system calendar — the picked day becomes
+                the week's last day, so any past week is one tap away. */}
+            <span className="relative inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary press">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {uzRangeLabel(from, anchor)}
+              <input
+                type="date"
+                aria-label="Haftani tanlash"
+                value={anchor}
+                max={today}
+                onChange={e => e.target.value && onAnchorChange(e.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </span>
+          </div>
         </div>
         {loading ? (
           <>
@@ -174,7 +207,7 @@ function WeekAnalyticsCard({ report, allTime, days, loading }: {
                       {points.map(p => (
                         <Cell
                           key={p.date}
-                          fill={p.date === today ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.45)'}
+                          fill={p.date === anchor ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.45)'}
                         />
                       ))}
                     </Bar>
@@ -210,9 +243,12 @@ export default function DashboardPage() {
   const [date, setDate] = useState(todayStr);
   const [day, setDay] = useState<SalesReportResponse | null>(null);
   const [staffSales, setStaffSales] = useState<UserSalesResponse[] | null>(null);
+  const [weekAnchor, setWeekAnchor] = useState(todayStr);
   const [week, setWeek] = useState<SalesReportResponse | null>(null);
   const [allTime, setAllTime] = useState<SalesReportResponse | null>(null);
   const [weekDays, setWeekDays] = useState<DailySalesResponse[] | null>(null);
+  const [weekLoading, setWeekLoading] = useState(true);
+  const [weekFailed, setWeekFailed] = useState(false);
   const [inventory, setInventory] = useState<InventoryStats | null>(null);
   const [recentOrders, setRecentOrders] = useState<OrderResponse[] | null>(null);
   const [dayLoading, setDayLoading] = useState(true);
@@ -249,33 +285,60 @@ export default function DashboardPage() {
     setDayLoading(false);
   }, [date]);
 
+  // The analytics card's own week, re-fetched when its anchor day changes.
+  // Same latest-request-only guard as the daily half: flipping between two
+  // anchors must never leave the older week's bars under the newer chip.
+  const weekSeq = useRef(0);
+  const loadWeek = useCallback(async () => {
+    const seq = ++weekSeq.current;
+    setWeekLoading(true);
+    const from = daysBeforeStr(weekAnchor, 6);
+    const [w, wd] = await Promise.allSettled([
+      reportsApi.range(from, weekAnchor),
+      reportsApi.rangeDaily(from, weekAnchor),
+    ]);
+    if (seq !== weekSeq.current) return;
+
+    setWeek(w.status === 'fulfilled' ? w.value : null);
+    setWeekDays(wd.status === 'fulfilled' ? wd.value : null);
+    setWeekFailed([w, wd].some(r => r.status === 'rejected'));
+    setWeekLoading(false);
+  }, [weekAnchor]);
+
   const loadRest = useCallback(async () => {
     setRestLoading(true);
-    const [w, all, wd, inv, ord] = await Promise.allSettled([
-      reportsApi.range(daysAgoStr(6), todayStr()),
-      // "Jami savdo" — the whole book. No dedicated endpoint, so the range one
-      // is asked from far before the shop existed up to today.
-      reportsApi.range('2020-01-01', todayStr()),
-      reportsApi.rangeDaily(daysAgoStr(6), todayStr()),
+    // "Jami savdo" — the whole book. The server publishes no all-time endpoint
+    // and has been seen refusing a range that reaches years before its data
+    // (the deployed tile sat on "—"), so narrower spans are tried before
+    // giving up.
+    const allTimeReport = async () => {
+      let lastErr: unknown;
+      for (const from of ['2020-01-01', '2025-01-01']) {
+        try { return await reportsApi.range(from, todayStr()); }
+        catch (e) { lastErr = e; }
+      }
+      throw lastErr;
+    };
+    const [all, inv, ord] = await Promise.allSettled([
+      allTimeReport(),
       inventorySummary(),
       ordersApi.getAll(0, 5),
     ]);
 
-    setWeek(w.status === 'fulfilled' ? w.value : null);
     setAllTime(all.status === 'fulfilled' ? all.value : null);
-    setWeekDays(wd.status === 'fulfilled' ? wd.value : null);
     setInventory(inv.status === 'fulfilled' ? inv.value : null);
     setRecentOrders(ord.status === 'fulfilled' ? extractContent(ord.value) : null);
-    setRestFailed([w, all, wd, inv, ord].some(r => r.status === 'rejected'));
+    setRestFailed([all, inv, ord].some(r => r.status === 'rejected'));
     setRestLoading(false);
   }, []);
 
   useEffect(() => { loadDay(); }, [loadDay]);
+  useEffect(() => { loadWeek(); }, [loadWeek]);
   useEffect(() => { loadRest(); }, [loadRest]);
 
   const isToday = date === todayStr();
-  const failed = dayFailed || restFailed;
-  const anyLoading = dayLoading || restLoading;
+  const failed = dayFailed || weekFailed || restFailed;
+  const anyLoading = dayLoading || weekLoading || restLoading;
 
   // Revenue is not split by cash vs card, but the credit portion IS reported —
   // so the only honest split is "paid up front" vs "sold on credit".
@@ -329,7 +392,7 @@ export default function DashboardPage() {
             </p>
             <Button
               size="sm" variant="outline" className="shrink-0 press"
-              onClick={() => { loadDay(); loadRest(); }}
+              onClick={() => { loadDay(); loadWeek(); loadRest(); }}
             >
               Qayta urinish
             </Button>
@@ -512,7 +575,14 @@ export default function DashboardPage() {
         </Card>
 
         <div className="mb-6">
-          <WeekAnalyticsCard report={week} allTime={allTime} days={weekDays} loading={restLoading} />
+          <WeekAnalyticsCard
+            anchor={weekAnchor}
+            onAnchorChange={setWeekAnchor}
+            report={week}
+            allTime={allTime}
+            days={weekDays}
+            loading={weekLoading}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
