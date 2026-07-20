@@ -200,11 +200,11 @@ function MobileBottomNav({ cartCount, unpaidDebtsCount }: {
               className={cn(tabClass, isActive ? 'text-primary' : 'text-muted-foreground')}
             >
               <span className={cn(
-                'relative flex items-center justify-center h-11 w-16 rounded-full transition-all duration-200',
-                isActive && 'bg-primary/[0.12] shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.15)]'
+                'relative flex items-center justify-center h-11 w-16 rounded-full transition-colors',
+                isActive && 'bg-primary/[0.12]'
               )}>
                 <Icon
-                  className={cn('h-7 w-7 transition-transform duration-200', isActive && 'scale-105')}
+                  className="h-7 w-7"
                   strokeWidth={isActive ? 2.3 : 1.8}
                 />
                 {badge > 0 && (
@@ -283,7 +283,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
         {/* User Profile Card — pinned to the bottom of the sheet */}
         <div className="mt-auto bg-background rounded-3xl p-4 flex items-center justify-between shadow-card border border-border">
           <div className="flex items-center gap-3">
-            <div className="h-14 w-14 rounded-full bg-gradient-primary flex items-center justify-center shadow-md shrink-0">
+            <div className="h-14 w-14 rounded-full bg-primary flex items-center justify-center shrink-0">
               <span className="text-2xl font-bold text-white">{user?.fullName?.[0]?.toUpperCase() ?? 'U'}</span>
             </div>
             <div>
@@ -351,7 +351,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 w-full flex flex-col bg-background relative md:max-w-none max-w-[430px] mx-auto md:mx-0 sm:border-x md:border-none sm:border-border sm:shadow-2xl md:shadow-none overflow-hidden transition-all duration-300">
+      <div className="flex-1 w-full flex flex-col bg-background relative md:max-w-none max-w-[430px] mx-auto md:mx-0 sm:border-x md:border-none sm:border-border sm:shadow-2xl md:shadow-none overflow-hidden">
         {/* safe-area-top lives on the <header>, the fixed h-14 on an inner row
             (the MobileOverlay pattern). Both on one element is a trap: with
             border-box sizing the inset padding eats the 56px box instead of

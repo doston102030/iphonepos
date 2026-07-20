@@ -324,7 +324,7 @@ function ProductDialog({
           </div>
 
           <div className="pt-4 pb-6 mt-auto">
-            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
             </Button>
           </div>
@@ -379,7 +379,7 @@ function RestockDialog({
             </FormItem>
           )} />
           <div className="mt-auto pt-6 pb-8">
-            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>Saqlash</Button>
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold" disabled={form.formState.isSubmitting}>Saqlash</Button>
           </div>
         </form>
       </Form>
@@ -450,7 +450,7 @@ function OutflowDialog({
             </FormItem>
           )} />
           <div className="mt-auto pt-6 pb-8">
-            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>Saqlash</Button>
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold" disabled={form.formState.isSubmitting}>Saqlash</Button>
           </div>
         </form>
       </Form>

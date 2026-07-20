@@ -353,7 +353,7 @@ export function BarcodeScannerDialog({
                     aria-pressed={torchOn}
                     className={cn(
                       'h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md transition-colors press',
-                      torchOn ? 'bg-amber-400 text-black shadow-[0_0_24px_rgba(251,191,36,0.55)]' : 'bg-white/15 text-white'
+                      torchOn ? 'bg-amber-400 text-black' : 'bg-white/15 text-white'
                     )}
                   >
                     {torchOn ? <Flashlight className="h-6 w-6" /> : <FlashlightOff className="h-6 w-6" />}

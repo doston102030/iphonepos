@@ -93,7 +93,7 @@ function SendSmsDialog({ open, onOpenChange, onSaved }: {
             </FormItem>
           )} />
           <div className="pt-4 pb-6 mt-auto">
-            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold" disabled={form.formState.isSubmitting}>
               <Send className="h-4 w-4 mr-1.5" />
               {form.formState.isSubmitting ? 'Yuborilmoqda...' : 'Yuborish'}
             </Button>

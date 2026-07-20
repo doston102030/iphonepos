@@ -89,16 +89,9 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-app flex flex-col items-center justify-center overflow-hidden bg-background px-6 pt-[calc(2rem+var(--inset-top))] pb-[calc(2rem+var(--inset-bottom))]">
-      {/* Soft ambient glow so the card doesn't float on a flat grey void.
-          Desktop-only: on mobile the sheet fills the screen and hides it anyway. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 hidden sm:block">
-        <div className="absolute -top-40 right-[10%] h-[26rem] w-[26rem] rounded-full bg-primary/[0.07] blur-3xl" />
-        <div className="absolute -bottom-48 left-[6%] h-[30rem] w-[30rem] rounded-full bg-success/[0.06] blur-3xl" />
-      </div>
-
       {/* Mobile keeps the edge-to-edge sheet; from sm up the same content sits
           in a centered card, which is the whole "desktop redesign". */}
-      <div className="relative w-full max-w-[340px] flex flex-col items-center gap-7 animate-fade-in sm:max-w-[400px] sm:rounded-3xl sm:border sm:border-border sm:bg-card sm:px-10 sm:py-10 sm:shadow-card">
+      <div className="relative w-full max-w-[340px] flex flex-col items-center gap-7 sm:max-w-[400px] sm:rounded-3xl sm:border sm:border-border sm:bg-card sm:px-10 sm:py-10 sm:shadow-card">
         <div className="flex flex-col items-center gap-5">
           <Logo className="h-9" />
           <div className="text-center">

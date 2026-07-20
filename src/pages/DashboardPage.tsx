@@ -396,7 +396,7 @@ export default function DashboardPage() {
                   <div key={s.userId} className="flex items-center gap-3">
                     <div className={cn(
                       'h-9 w-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold',
-                      i === 0 ? 'bg-gradient-primary text-white shadow-md' : 'bg-muted text-muted-foreground',
+                      i === 0 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground',
                     )}>
                       {s.fullName?.[0]?.toUpperCase() ?? '?'}
                     </div>
@@ -412,7 +412,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1.5">
                         <div
-                          className={cn('h-full rounded-full', i === 0 ? 'bg-gradient-primary' : 'bg-primary/50')}
+                          className={cn('h-full rounded-full', i === 0 ? 'bg-primary' : 'bg-primary/50')}
                           style={{ width: `${pct}%` }}
                         />
                       </div>

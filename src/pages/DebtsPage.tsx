@@ -126,7 +126,7 @@ function DebtDialog({
             </FormItem>
           )} />
           <div className="mt-auto pt-6 pb-8">
-            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
             </Button>
           </div>
@@ -195,7 +195,7 @@ function PayDialog({
 
         <div className="px-3 pb-6 mt-auto">
           <Button 
-            className="w-full h-14 rounded-2xl text-xl font-bold bg-success hover:bg-success/90 shadow-lg shadow-success/25 mb-4 mx-1" 
+            className="w-full h-14 rounded-2xl text-xl font-bold bg-success hover:bg-success/90 mb-4 mx-1" 
             onClick={handlePay} 
             disabled={loading || amountStr === '' || parseInt(amountStr, 10) <= 0}
           >

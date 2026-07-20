@@ -137,7 +137,7 @@ function UserDialog({
             </FormItem>
           )} />
           <div className="pt-4 pb-6 mt-auto">
-            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary/25" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
             </Button>
           </div>

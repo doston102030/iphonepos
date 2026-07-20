@@ -507,7 +507,7 @@ function CheckoutSheet({ open, onOpenChange, onCompleted }: {
           <Button
             type="submit"
             form="checkout-form"
-            className="w-full h-14 rounded-2xl text-lg font-bold bg-success hover:bg-success/90 shadow-lg shadow-success/20"
+            className="w-full h-14 rounded-2xl text-lg font-bold bg-success hover:bg-success/90"
             disabled={form.formState.isSubmitting || items.length === 0}
           >
             {form.formState.isSubmitting ? 'Saqlanmoqda...' : 'Buyurtmani tasdiqlash'}
